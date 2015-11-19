@@ -36,17 +36,18 @@ resetDB() :-
 	retractall(playerCoins(_)),
 	retractall(playerCards(_)).
 
-
 start() :-
 	initialization().
 
 initialization() :-
 	agents(Agents),
 	proper_length(Agents, N_Player), !,
-	(N_Player == 2 -> (N_Coin is 4, !);
-	N_Player == 3 -> (N_Coin is 5, !);
-	N_Player == 4 -> (N_Coin is 7, !);
-	false),
+	(	
+		N_Player == 2 -> N_Coin is 4;
+		N_Player == 3 -> N_Coin is 5; 
+		N_Player == 4 -> N_Coin is 7;
+		false
+	),
 
 	N_Noble is N_Player + 1,
 	
@@ -75,7 +76,7 @@ initialization() :-
 	assert(area3(Area3)), !,
 	assert(nobles(Nobles)), !,
 	assert(coins([N_Coin, N_Coin, N_Coin, N_Coin, N_Coin, 3])), !,
-
+	
 	initializePlayers(N_Player).
 
 
@@ -93,7 +94,6 @@ run(Deck1, Deck2, Deck3, Area1, Area2, Area3, Nobles) :-
 %		whatIsYourAction(state, newIndex, action),
 %		applyAction(state, action),
 %		run().
-
 
 draw_N_cards(_, [], To, [], To).
 draw_N_cards(0, From, To, From, To).
@@ -139,22 +139,24 @@ populateList(Input, Parameter, Count, Result) :-
 	append(Input, [Parameter], NewInput),
 	populateList(NewInput, Parameter, NewCount, Result).
 
-
-
 take_coins(CoinList) :- 
 	proper_length(CoinList, 5),
-	coins(BoardCoins),
-	nth0(0, BoardCoins, BoardWhite),
-	nth0(1, BoardCoins, BoardBlue),
-	nth0(2, BoardCoins, BoardGreen),
-	nth0(3, BoardCoins, BoardRed),
-	nth0(4, BoardCoins, BoardBlack),
+	min_member(MinCoin, CoinList),
+	MinCoin is 0,
 	nth0(0, CoinList, White),
 	nth0(1, CoinList, Blue),
 	nth0(2, CoinList, Green),
 	nth0(3, CoinList, Red),
 	nth0(4, CoinList, Black),
 
+	coins(BoardCoins),
+	nth0(0, BoardCoins, BoardWhite),
+	nth0(1, BoardCoins, BoardBlue),
+	nth0(2, BoardCoins, BoardGreen),
+	nth0(3, BoardCoins, BoardRed),
+	nth0(4, BoardCoins, BoardBlack),
+	nth0(5, BoardCoins, BoardGold),
+	
 	WhiteLeft is BoardWhite - White,
 	BlueLeft is BoardBlue - Blue,
 	GreenLeft is BoardGreen - Green,
@@ -167,40 +169,38 @@ take_coins(CoinList) :-
 	RedLeft >= 0,
 	BlackLeft >= 0,
 
-	sum_list(CoinList, SumCoinList),
-	(SumCoinList == 2 -> Alfa is 0;
-	SumCoinList == 3 -> Alfa is 1; false),
-
 	(White > 0 -> BetaWhite is 1; BetaWhite is 0),
 	(Blue > 0 -> BetaBlue is 1; BetaBlue is 0),
 	(Green > 0 -> BetaGreen is 1; BetaGreen is 0),
 	(Red > 0 -> BetaRed is 1; BetaRed is 0),
 	(Black > 0 -> BetaBlack is 1; BetaBlack is 0),
-	!,
 
+	sum_list(CoinList, SumCoinList),
 	SumBeta is (BetaWhite + BetaBlue + BetaGreen + BetaRed + BetaBlack),
-	(0 is (Alfa * (SumBeta-3)) + ((1-Alfa) * (SumBeta-1))),
-	(0 is ((Alfa * BetaWhite * (White-1)) + ((1-Alfa) * BetaWhite * (White-2)) + ((1-BetaWhite) * White))),
-	(0 is ((Alfa * BetaBlue * (Blue-1)) + ((1-Alfa) * BetaBlue * (Blue-2)) + ((1-BetaBlue) * Blue))),
-	(0 is ((Alfa * BetaGreen * (Green-1)) + ((1-Alfa) * BetaGreen * (Green-2)) + ((1-BetaGreen) * Green))),
-	(0 is ((Alfa * BetaRed * (Red-1)) + ((1-Alfa) * BetaRed * (Red-2)) + ((1-BetaRed) * Red))),
-	(0 is ((Alfa * BetaBlack * (Black-1)) + ((1-Alfa) * BetaBlack * (Black-2)) + ((1-BetaBlack) * Black))),
-	!,
-	((0 is (1-Alfa));(0 is BetaWhite);(WhiteLeft >= 2)), !,
-	((0 is (1-Alfa));(0 is BetaBlue);(BlueLeft >= 2)), !,
-	((0 is (1-Alfa));(0 is BetaGreen);(GreenLeft >= 2)), !,
-	((0 is (1-Alfa));(0 is BetaRed);(RedLeft >= 2)), !,
-	((0 is (1-Alfa));(0 is BetaBlack);(BlackLeft >= 2)), !.
+	
+	(
+		((SumCoinList == 2), (SumBeta == 1)) -> (!, two_of_a_kind(BetaWhite, WhiteLeft, BetaBlue, BlueLeft, BetaGreen, GreenLeft, BetaRed, RedLeft, BetaBlack, BlackLeft));
+		((SumCoinList == 3), (SumBeta == 3)) -> (!);
+		((SumCoinList == 2), (SumBeta == 2)) -> (!, no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, Black, BlackLeft)); 
+		(SumCoinList == 1) -> (!, no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, Black, BlackLeft));
+		false
+	), !,
+
+	retract(coins(_)), !,
+	assert(coins([WhiteLeft, BlueLeft, GreenLeft, RedLeft, BlackLeft, BoardGold])), !.
 
 
-%white#,blue#,green#,red#,black#
+two_of_a_kind(BetaWhite, WhiteLeft, BetaBlue, BlueLeft, BetaGreen, GreenLeft, BetaRed, RedLeft, BetaBlack, BlackLeft):-
+	((0 is BetaWhite);(WhiteLeft >= 2)), !,
+	((0 is BetaBlue);(BlueLeft >= 2)), !,
+	((0 is BetaGreen);(GreenLeft >= 2)), !,
+	((0 is BetaRed);(RedLeft >= 2)), !,
+	((0 is BetaBlack);(BlackLeft >= 2)), !.
 
-
-
-
-
-
-
-
-
+no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, Black, BlackLeft):-
+	(White == 0 -> WhiteLeft == 0; WhiteLeft < 3),
+	(Blue == 0 -> BlueLeft == 0; BlueLeft < 3),
+	(Green == 0 -> GreenLeft == 0; GreenLeft < 3),
+	(Red == 0 -> RedLeft == 0; RedLeft < 3),
+	(Black == 0 -> BlackLeft == 0; BlackLeft < 3).
 
