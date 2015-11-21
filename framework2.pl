@@ -4,15 +4,32 @@
 :- dynamic nobles/2.
 :- dynamic reserves/2.
 
+:- dynamic currentAgent/1.
+
 :- include(deck).
 
-agents([bot1, bot2, bot3, bot4]). % Read from file
+agents([agent1, agent2, agent3, agent4]). % Read from file
+
+start() :-
+	initialization(),
+	assert(currentAgent(1)),
+	run().
+
+run() :- % WORK WITH AGENT NAMES!
+	game_did_not_end(),
+	agents(_agents),
+	currentAgent(_agent),
+	nth1(_agent, _agents, _agentName),
+	ask_action(_agentName, _actionType, _actionParameters),
+	apply_action(_agentName, _actionType, _actionParameters),
+	next_agent(),
+	run().
 
 initialization() :-
 	agents(_agents), proper_length(_agents, _nAgent),
-	(	_nAgent == 2 -> _nToken = 4;
-		_nAgent == 3 -> _nToken = 5;
-		_nAgent == 4 -> _nToken = 7;
+	(	_nAgent = 2 -> _nToken = 4;
+		_nAgent = 3 -> _nToken = 5;
+		_nAgent = 4 -> _nToken = 7;
 		false),
 	_nNoble is _nAgent + 1,
 
@@ -29,8 +46,7 @@ initialization() :-
 	draw_n_cards(4, _deck3, _null4, _deck3New, _area3), !,
 	draw_n_cards(_nNoble, _nobles, _nullNobles, _, _noblesNew), !,
 
-	% Reset DB?
-	
+	% Reset DB with retractall???
 	(retract(cards(deck1, _)); true),
 	(retract(cards(deck2, _)); true),
 	(retract(cards(deck3, _)); true),
@@ -51,7 +67,7 @@ initialization() :-
 	forall(between(1, _nAgent, _n),
 		(
 			atom_concat(agent, _n, _agent),
-			assert(tokens(_agent, [])), !,
+			assert(tokens(_agent, [0, 0, 0, 0, 0, 0])), !,
 			assert(cards(_agent, [])), !,
 			assert(reserves(_agent, [])), !,
 
@@ -158,11 +174,13 @@ take_tokens(_agent, _tokens) :-
 	assert(tokens(board, [_whiteLeft, _blueLeft, _greenLeft, _redLeft, _blackLeft, _yellowBoard])),
 
 	tokens(_agent, _tokensAgent),
-	maplist(plus, _tokensAgent, _tokens, _tokensAgentNew),
+	last(_tokensAgent, _yellowAgent),
+	append(_tokens, [_yellowAgent], _tokensWithYellow),
+	maplist(plus, _tokensAgent, _tokensWithYellow, _tokensAgentNew),
 	retract(tokens(_agent, _)),
 	assert(tokens(_agent, _tokensAgentNew)).
 
-purchase_card(_agent, _tier, _position) :- % DO NOT FORGET ABOUT YELLOW TOKENS
+purchase_card(_agent, [_tier, _position]) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	between(1, 3, _tier),
 	between(1, 4, _position),
 
@@ -175,7 +193,8 @@ purchase_card(_agent, _tier, _position) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	tokens(_agent, _tokensAgent),
 
 	nth1(_position, _cardsArea, _card),
-	append([_,_,_], _cardCost, _card),
+	append([_,_,_], _cardCostTemp, _card),
+	append(_cardCostTemp, [0], _cardCost),
 	
 	maplist(nth1(3), _cardsAgent, _cardsAgentColors),
 	aggregate_all(count, member('white', _cardsAgentColors), _whiteCards),
@@ -183,8 +202,8 @@ purchase_card(_agent, _tier, _position) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	aggregate_all(count, member('green', _cardsAgentColors), _greenCards),
 	aggregate_all(count, member('red', _cardsAgentColors), _redCards),
 	aggregate_all(count, member('black', _cardsAgentColors), _blackCards),
-	_developmentsAgent = [_whiteCards, _blueCards, _greenCards, _redCards, _blackCards],
-		
+	_developmentsAgent = [_whiteCards, _blueCards, _greenCards, _redCards, _blackCards, 0],
+		% YELLOW TOKENS ARE ZERO HERE, CHECK FROM AGENT TOKENS!
 	maplist(plus, _tokensAgent, _developmentsAgent, _wealthAgent),
 	maplist(plus, _cardCost, _leftoverAgent, _wealthAgent),
 	maplist(between(0, infinite), _leftoverAgent), % affordance check
@@ -205,10 +224,9 @@ purchase_card(_agent, _tier, _position) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	retract(cards(_area, _)),
 	assert(cards(_area, _cardsAreaNew)),
 	retract(cards(_deck, _)),
-	assert(cards(_deck, _cardsDeckNew)),
+	assert(cards(_deck, _cardsDeckNew)).
 
-	true. % delete this line
-
+reserve_card(_agent, [_tier, _position]) :- !.
 
 
 negative_to_zero([], []) :- !.
@@ -220,3 +238,41 @@ negative_to_zero([H|T], [0|Result]) :-
 	negative_to_zero(T, Result).
 negative_to_zero([H|T], [H|Result]) :-
 	negative_to_zero(T, Result).
+
+
+game_did_not_end() :- !.
+
+next_agent() :- !.
+
+
+ask_action(_agent, _actionType, _actionParameters) :-
+	print_board(),
+	write('I am agent: '), write(_agent), nl,
+  	write('Action?'), nl,
+	read(_actionType),
+	write('Parameters?'), nl,
+	read(_actionParameters).
+
+
+apply_action(_agent, _actionType, _actionParameters) :-
+	between(1, 3, _actionType),
+	(	_actionType = 1 -> take_tokens(_agent, _actionParameters);
+		_actionType = 2 -> purchase_card(_agent, _actionParameters);
+		_actionType = 3 -> reserve_card(_agent, _actionParameters);
+		false).
+
+
+print_board() :-
+	tokens(board, _tokensBoard),
+	% foreach player get tokens, cards, nobles, reserves
+	cards(area1, _area1),
+	cards(area2, _area2),
+	cards(area3, _area3),
+	nobles(board, _noblesBoard),
+
+	write('Tokens available: '), write(_tokensBoard), nl,
+	write('Nobles: '), write(_noblesBoard), nl,
+	write('Cards tier 3: '), write(_area3), nl,
+	write('Cards tier 2: '), write(_area2), nl,
+	write('Cards tier 1: '), write(_area1), nl,
+	true.
