@@ -8,6 +8,8 @@
 :- dynamic coins/1.
 :- dynamic playerCoins/1.
 :- dynamic playerCards/1.
+:- dynamic playerReserves/1.
+:- dynamic currentPlayer/1.
 
 :- retractall(deck1(_)).
 :- retractall(deck2(_)).
@@ -19,6 +21,7 @@
 :- retractall(coins(_)).
 :- retractall(playerCoins(_)).
 :- retractall(playerCards(_)).
+:- retractall(currentPlayer(_)).
 
 :- include(deck).
 
@@ -34,10 +37,12 @@ resetDB() :-
 	retractall(nobles(_)),
 	retractall(coins(_)),
 	retractall(playerCoins(_)),
-	retractall(playerCards(_)).
+	retractall(playerCards(_)),
+	retractall(currentPlayer(_)).
 
 start() :-
-	initialization().
+	initialization(),
+	run().
 
 initialization() :-
 	agents(Agents),
@@ -80,14 +85,14 @@ initialization() :-
 	initializePlayers(N_Player).
 
 
-run(Deck1, Deck2, Deck3, Area1, Area2, Area3, Nobles) :- 
-	display(Deck1),
-	display(Deck2),
-	display(Deck3),
-	display(Area1),
-	display(Area2),
-	display(Area3),
-	display(Nobles).
+run() :- 
+	currentPlayer(CurrentPlayer),
+	agents(Agents),
+	nth(CurrentPlayer, Agents, Agent),
+	
+	
+	next_player().
+	%run().
 
 %gameDidNotEnd(state),
 %		whoseTurnIsIt(index, newIndex),
@@ -100,9 +105,9 @@ draw_N_cards(0, From, To, From, To).
 draw_N_cards(N, From, To, Rest, Result) :-
 	N > 0,
 	M is N-1,
-	random_select(X, From, Remainder),
-	select(null, To, X, Acc),
-	draw_N_cards(M, Remainder, Acc, Rest, Result).
+	(random_select(X, From, Remainder) -> 
+		(select(null, To, X, Acc), draw_N_cards(M, Remainder, Acc, Rest, Result));
+		true).
 
 empty_list_of_length_N(0, []).
 empty_list_of_length_N(1, [null]).
@@ -119,11 +124,13 @@ list_of_length_N(N, X, [X|List]) :-
 	list_of_length_N(M, X, List).
 
 initializePlayers(N) :-
+	assert(currentPlayer(1)),
 	initializePlayerCoins(N),
 	initializePlayerCards(N).
 
 initializePlayerCoins(N) :-
-	list_of_length_N(6, 0, L),
+	%list_of_length_N(6, 0, L),
+	list_of_length_N(6, 7, L),
 	populateList([], L, N, PlayerCoins), !,
 	assert(playerCoins(PlayerCoins)), !.
 
@@ -181,7 +188,6 @@ take_coins(CoinList) :-
 	(
 		((SumCoinList == 2), (SumBeta == 1)) -> (!, two_of_a_kind(BetaWhite, WhiteLeft, BetaBlue, BlueLeft, BetaGreen, GreenLeft, BetaRed, RedLeft, BetaBlack, BlackLeft));
 		((SumCoinList == 3), (SumBeta == 3)) -> (!);
-		((SumCoinList == 2), (SumBeta == 2)) -> (!, no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, Black, BlackLeft)); 
 		(SumCoinList == 1) -> (!, no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, Black, BlackLeft));
 		false
 	), !,
@@ -204,3 +210,111 @@ no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, B
 	(Red == 0 -> RedLeft == 0; RedLeft < 3),
 	(Black == 0 -> BlackLeft == 0; BlackLeft < 3).
 
+next_player() :-
+	agents(Agents),
+	proper_length(Agents, N_Player),
+	currentPlayer(CurrentPlayer),
+	NextPlayer is ((CurrentPlayer+1) mod N_Player),
+	retract(currentPlayer(_)),
+	assert(currentPlayer(NextPlayer)).
+
+purchase_card(Player, Tier, Position) :-
+	playerCoins(PlayerCoins),
+	nth1(Player, PlayerCoins, Coins),
+
+	playerCards(PlayerCards),
+	nth1(Player, PlayerCards, Cards),
+
+	findall(Color, (member(PlayerCard, PlayerCards), nth1(3, PlayerCard, Color)), Colors),
+	findall(true, member('white', Colors), Whites),
+	length(Whites, WhiteCards),
+	findall(true, member('blue', Colors), Blues),
+	length(Blues, BlueCards),
+	findall(true, member('green', Colors), Greens),
+	length(Greens, GreenCards),
+	findall(true, member('red', Colors), Reds),
+	length(Reds, RedCards),
+	findall(true, member('black', Colors), Blacks),
+	length(Blacks, BlackCards),	
+	
+	nth1(1, Coins, WhiteCoins),
+	nth1(2, Coins, BlueCoins),
+	nth1(3, Coins, GreenCoins),
+	nth1(4, Coins, RedCoins),
+	nth1(5, Coins, BlackCoins),
+	nth1(6, Coins, GoldCoins),
+
+	between(1, 4, Position),
+	(
+		(Tier == 1) -> (area1(Area), deck1(Deck));
+		(Tier == 2) -> (area2(Area), deck2(Deck));
+		(Tier == 3) -> (area3(Area), deck3(Deck));
+		false
+	),
+	nth1(Position, Area, Card),
+
+	nth1(4, Card, WhiteCost),
+	nth1(5, Card, BlueCost),
+	nth1(6, Card, GreenCost),
+	nth1(7, Card, RedCost),
+	nth1(8, Card, BlackCost),
+
+	WhiteLeft is (WhiteCoins + WhiteCards - WhiteCost),
+	BlueLeft is (BlueCoins + BlueCards - BlueCost),
+	GreenLeft is (GreenCoins + GreenCards - GreenCost),
+	RedLeft is (RedCoins + RedCards - RedCost),
+	BlackLeft is (BlackCoins + BlackCards - BlackCost),
+
+	WhiteLeft >= 0,
+	BlueLeft >= 0,
+	GreenLeft >= 0,
+	RedLeft >= 0,
+	BlackLeft >= 0,
+
+	% this is wrong
+	WhiteCoinLeft is (WhiteCoins - WhiteCost + WhiteCards),
+	BlueCoinLeft is (BlueCoins - BlueCost + BlueCards),
+	GreenCoinLeft is (GreenCoins - GreenCost + GreenCards),
+	RedCoinLeft is (RedCoins - RedCost + RedCards),
+	BlackCoinLeft is (BlackCoins - BlackCost + BlackCards),
+
+	CoinsNew = [WhiteCoinLeft, BlueCoinLeft, GreenCoinLeft, RedCoinLeft, BlackCoinLeft, GoldCoins],
+
+	append(Cards, [Card], CardsNew),
+	select(Cards, PlayerCards, CardsNew, PlayerCardsNew),
+	select(Coins, PlayerCoins, CoinsNew, PlayerCoinsNew),
+	select(Card, Area, null, AreaTemp),
+	draw_N_cards(1, Deck, AreaTemp, DeckNew, AreaNew), !,
+
+	retract(playerCards(_)),
+	assert(playerCards(PlayerCardsNew)),
+	retract(playerCoins(_)),
+	assert(playerCoins(PlayerCoinsNew)),
+
+	(
+		(Tier == 1) -> (
+			retract(deck1(_)),
+			assert(deck1(DeckNew)),
+			retract(area1(_)),
+			assert(area1(AreaNew))
+		);
+		(Tier == 2) -> (
+			retract(deck2(_)),
+			assert(deck2(DeckNew)),
+			retract(area2(_)),
+			assert(area2(AreaNew))
+		);
+		(Tier == 3) -> (
+			retract(deck3(_)),
+			assert(deck3(DeckNew)),
+			retract(area3(_)),
+			assert(area3(AreaNew))
+		);
+		false
+	).
+
+	
+%To pay the cost, first the player has to 
+%look for cost reductions provided by 
+%his built developments, and only pay the 
+%surplus with gem chips

@@ -1,6 +1,6 @@
 %cards:[id,point,color,white#,blue#,green#,red#,black#]
 %ID's correspond to images of the card, so you can use this to fetch the related card.
-deck1([
+cards(deck1, [
 [1,0,white,0,3,0,0,0],
 [2,0,white,0,0,0,2,1],
 [3,0,white,0,1,1,1,1],
@@ -43,7 +43,7 @@ deck1([
 [40,0,black,0,0,1,3,1]
 ]).
 
-deck2([
+cards(deck2, [
 [101,2,white,0,0,0,5,0],
 [102,3,white,6,0,0,0,0],
 [103,1,white,0,0,3,2,2],
@@ -76,7 +76,7 @@ deck2([
 [130,2,black,0,0,5,3,0]
 ]).
 
-deck3([
+cards(deck3, [
 [201,4,white,0,0,0,0,7],
 [202,5,white,3,0,0,0,7],
 [203,4,white,3,0,0,3,6],
@@ -100,7 +100,7 @@ deck3([
 ]).
 
 %nobles:[id,white#,blue#,green#,red#,black#], always 3 points
-nobles([
+nobles(board, [
 [501,3,3,0,0,3],
 [502,0,3,3,3,0],
 [503,3,0,0,3,3],
