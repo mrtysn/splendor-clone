@@ -15,13 +15,16 @@ start() :-
 	assert(currentAgent(1)),
 	run().
 
+
+% add logging
 run() :- % WORK WITH AGENT NAMES!
 	game_did_not_end(),
 	agents(_agents),
 	currentAgent(_agent),
 	nth1(_agent, _agents, _agentName),
-	ask_action(_agentName, _actionType, _actionParameters),
+	ask_action(_agentName, _actionType, _actionParameters), % pas geçme opsiyonu
 	apply_action(_agentName, _actionType, _actionParameters),
+	% check nobles
 	next_agent(),
 	run().
 
@@ -112,7 +115,7 @@ list_n_duplicate(N, X, [X|List]) :-
 	list_n_duplicate(M, X, List).
 
 
-take_tokens(_agent, _tokens) :-
+take_tokens(_agent, _tokens) :- % #token > 10 ise return tokens until #token = 10
 	proper_length(_tokens, 5), min_member(_min, _tokens), _min = 0,
 	nth1(1, _tokens, _white),
 	nth1(2, _tokens, _blue),
@@ -161,7 +164,7 @@ take_tokens(_agent, _tokens) :-
 		(_tokensSum = 3, _betaSum = 3) -> !;
 		((_tokensSum = 2, _betaSum = 2); _tokensSum = 1) -> 
 			(
-				(_white = 0 -> _whiteLeft = 0; _whiteLeft < 3),
+				(_white = 0 -> _whiteLeft = 0; _whiteLeft < 3), % pile 3 ten büyükse 2 çekme kuralı kalktı
 				(_blue = 0 -> _blueLeft = 0; _blueLeft < 3),
 				(_green = 0 -> _greenLeft = 0; _greenLeft < 3),
 				(_red = 0 -> _redLeft = 0; _redLeft < 3),
