@@ -12,6 +12,11 @@
 	%(free(_agent3Area);true),
 	%(free(_agent4Area);true).
 
+card_width(200).
+card_height(200).
+gap_width(20).
+gap_height(20).
+
 test :-
 	update_card(201, 3, 1),
 	update_card(202, 3, 2),
@@ -31,13 +36,16 @@ test :-
 	!.
 
 update_card(_id, _tier, _position) :-
+	card_width(_cardWidth), card_height(_cardHeight),
+
 	atomic_list_concat(['./resources/', _id, '.jpg'], _path),
 	atomic_list_concat(['tier', _tier, 'slot', _position], _reference),
 	
 	((get(@_reference, member(bitmap), _currentCard), free(_currentCard));true),
 	new(_card, scaled_bitmap(image(_path))),
-	send(_card, scale, size(75, 100)),
+	send(_card, scale, size(_cardWidth, _cardHeight)),
 	send(@_reference, append, _card).
+	
 
 
 free_handles() :-
@@ -59,6 +67,8 @@ free_handles() :-
 	(free(@board);true).
 
 draw :-
+	card_width(_cardWidth), card_height(_cardHeight),
+	gap_width(_gapWidth), gap_height(_gapHeight),
 	free_handles(),
 	_nullTokens = '0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0', % atomic_list_concat([0,0,0,0,0,0], ' / ', X)
 	
@@ -96,26 +106,35 @@ draw :-
 	send(_decks, append, new(_tier2, dialog_group('Tier 2', box)), next_row),
 	send(_decks, append, new(_tier1, dialog_group('Tier 1', box)), next_row),
 
+	_cardSize = size(_cardWidth, _cardHeight),
+	_gapSize = size(_gapWidth, _gapHeight),
+	_tierSize = size(5*_cardWidth + 6*_gapWidth, _cardHeight + 2*_gapHeight),
 	
-	
-	send(_tier3, append, new(@tier3slot0, dialog)),
-	send(_tier3, append, new(@tier3slot1, dialog), right),
-	send(_tier3, append, new(@tier3slot2, dialog), right),
-	send(_tier3, append, new(@tier3slot3, dialog), right),
-	send(_tier3, append, new(@tier3slot4, dialog), right),
-	
+	send(_tier3, gap, _gapSize),
+	send(_tier3, size, _tierSize),
+	send(_tier3, append, new(@tier3slot0, dialog(size, _cardSize))),
+	send(_tier3, append, new(@tier3slot1, dialog(size, _cardSize)), right),
+	send(_tier3, append, new(@tier3slot2, dialog(size, _cardSize)), right),
+	send(_tier3, append, new(@tier3slot3, dialog(size, _cardSize)), right),
+	send(_tier3, append, new(@tier3slot4, dialog(size, _cardSize)), right),
 
-	send(_tier2, append, new(@tier2slot0, dialog)),
-	send(_tier2, append, new(@tier2slot1, dialog), right),
-	send(_tier2, append, new(@tier2slot2, dialog), right),
-	send(_tier2, append, new(@tier2slot3, dialog), right),
-	send(_tier2, append, new(@tier2slot4, dialog), right),
+	send(_tier2, gap, _gapSize),
+	send(_tier2, size, _tierSize),
+	send(_tier2, append, new(@tier2slot0, dialog(size, _cardSize))),
+	send(_tier2, append, new(@tier2slot1, dialog(size, _cardSize)), right),
+	send(_tier2, append, new(@tier2slot2, dialog(size, _cardSize)), right),
+	send(_tier2, append, new(@tier2slot3, dialog(size, _cardSize)), right),
+	send(_tier2, append, new(@tier2slot4, dialog(size, _cardSize)), right),
 
-	send(_tier1, append, new(@tier1slot0, dialog)),
-	send(_tier1, append, new(@tier1slot1, dialog), right),
-	send(_tier1, append, new(@tier1slot2, dialog), right),
-	send(_tier1, append, new(@tier1slot3, dialog), right),
-	send(_tier1, append, new(@tier1slot4, dialog), right),
+	send(_tier1, gap, _gapSize),
+	send(_tier1, size, _tierSize),
+	send(_tier1, append, new(@tier1slot0, dialog(size, _cardSize))),
+	send(_tier1, append, new(@tier1slot1, dialog(size, _cardSize)), right),
+	send(_tier1, append, new(@tier1slot2, dialog(size, _cardSize)), right),
+	send(_tier1, append, new(@tier1slot3, dialog(size, _cardSize)), right),
+	send(_tier1, append, new(@tier1slot4, dialog(size, _cardSize)), right),
+
+	
 
 	send(@board, append, new(_tokens, dialog_group('Tokens', box)), right),
 
@@ -140,6 +159,7 @@ draw :-
 	send(_currentAgent, append, new(_currentAgentChips, label(text, 'Chips: 0/10')), right),
 	send(_currentAgent, append, new(_currentAgentTokens, label(text, _nullTokens)), right),
 	send(_currentAgent, append, new(_currentAgentReserves, label(text, 'Reserves')), right),
+
 
 	send(@board, open),
 	!.
