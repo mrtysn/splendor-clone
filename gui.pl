@@ -1,23 +1,19 @@
 :- use_module(library(pce)).
 :- use_module(library(scaledbitmap)).
 
-%:- initialization(draw_empty_board()).
-
-%(send(+Receiver,+Selector(...Args...)))
-
-% _w1hiteLeft, _blueLeft, _greenLeft, _redLeft, _blackLeft
-
-	%(free(_agent1Area);true),
-	%(free(_agent2Area);true),
-	%(free(_agent3Area);true),
-	%(free(_agent4Area);true).
-
-card_width(200).
-card_height(200).
-gap_width(20).
-gap_height(20).
+card_edge(200).
+noble_edge(120).
+token_edge(80).
 
 test :-
+	draw_tokens,
+
+	update_card(501, 0, 1),
+	update_card(502, 0, 2),
+	update_card(503, 0, 3),
+	update_card(504, 0, 4),
+	update_card(505, 0, 5),
+
 	update_card(201, 3, 1),
 	update_card(202, 3, 2),
 	update_card(203, 3, 3),
@@ -35,19 +31,36 @@ test :-
 
 	!.
 
+draw_tokens :-
+	token_edge(_tokenEdge),
+	foreach((between(1,6, _index), 
+		atomic_list_concat(['./resources/token', _index, '.jpg'], _path),
+		atomic_list_concat(['token', _index], _reference),
+		new(_card, scaled_bitmap(image(_path)))
+		), 
+		(
+		send(_card, scale, size(_tokenEdge, _tokenEdge)),
+		send(@_reference, append, _card), !)
+		),
+	!
+	.
+
 update_card(_id, _tier, _position) :-
-	card_width(_cardWidth), card_height(_cardHeight),
+	card_edge(_cardEdge), noble_edge(_nobleEdge),
 
 	atomic_list_concat(['./resources/', _id, '.jpg'], _path),
 	atomic_list_concat(['tier', _tier, 'slot', _position], _reference),
 	
 	((get(@_reference, member(bitmap), _currentCard), free(_currentCard));true),
 	new(_card, scaled_bitmap(image(_path))),
-	send(_card, scale, size(_cardWidth, _cardHeight)),
-	send(@_reference, append, _card).
+	(_tier = 0 -> 
+		send(_card, scale, size(_nobleEdge, _nobleEdge));
+		send(_card, scale, size(_cardEdge, _cardEdge))
+	),
 	
+	send(@_reference, append, _card).
 
-
+% USE pce_global
 free_handles() :-
 	(free(@tier3slot0);true),
 	(free(@tier3slot1);true),
@@ -64,16 +77,32 @@ free_handles() :-
 	(free(@tier1slot2);true),
 	(free(@tier1slot3);true),
 	(free(@tier1slot4);true),
+	(free(@tier0slot1);true),
+	(free(@tier0slot2);true),
+	(free(@tier0slot3);true),
+	(free(@tier0slot4);true),
+	(free(@tier0slot5);true),
+	(free(@token1);true),
+	(free(@token2);true),
+	(free(@token3);true),
+	(free(@token4);true),
+	(free(@token5);true),
+	(free(@token6);true),
 	(free(@board);true).
 
 draw :-
-	card_width(_cardWidth), card_height(_cardHeight),
-	gap_width(_gapWidth), gap_height(_gapHeight),
 	free_handles(),
-	_nullTokens = '0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0', % atomic_list_concat([0,0,0,0,0,0], ' / ', X)
-	
 	new(@board, dialog('Splendor')),
+	create_scoreboard,
+	create_card_area,
+	create_token_area,
+	create_noble_area,
+	create_focus_area,
+	send(@board, open),
+	!.
 
+create_scoreboard :-
+	_nullTokens = '0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0', % atomic_list_concat([0,0,0,0,0,0], ' / ', X)
 	send(@board, append, new(_scoreBoard, dialog_group('Score Board', group))),
 	
 	send(_scoreBoard, append, new(_agent1Area, dialog_group('Agent 1 Name', box))),
@@ -98,17 +127,19 @@ draw :-
 	send(_agent4Area, append, new(_agent4Score, label(text, 'Score')), next_row),
 	send(_agent4Area, append, new(_agent4Chips, label(text, 'Chips: 0/10')), next_row),
 	send(_agent4Area, append, new(_agent4Tokens, label(text, _nullTokens)), next_row),
-	send(_agent4Area, append, new(_agent4Reserves, label(text, 'Reserves')), next_row),
-	
+	send(_agent4Area, append, new(_agent4Reserves, label(text, 'Reserves')), next_row).
+
+create_card_area :-
+	card_edge(_cardEdge),
 	send(@board, append, new(_decks, dialog_group('cards', group)), right),
 
 	send(_decks, append, new(_tier3, dialog_group('Tier 3', box))),
 	send(_decks, append, new(_tier2, dialog_group('Tier 2', box)), next_row),
 	send(_decks, append, new(_tier1, dialog_group('Tier 1', box)), next_row),
 
-	_cardSize = size(_cardWidth, _cardHeight),
-	_gapSize = size(_gapWidth, _gapHeight),
-	_tierSize = size(5*_cardWidth + 6*_gapWidth, _cardHeight + 2*_gapHeight),
+	_cardSize = size(_cardEdge, _cardEdge),
+	_gapSize = size(_cardEdge / 10, _cardEdge / 10),
+	_tierSize = size(_cardEdge * 56 / 10, _cardEdge * 12 / 10),
 	
 	send(_tier3, gap, _gapSize),
 	send(_tier3, size, _tierSize),
@@ -134,32 +165,53 @@ draw :-
 	send(_tier1, append, new(@tier1slot3, dialog(size, _cardSize)), right),
 	send(_tier1, append, new(@tier1slot4, dialog(size, _cardSize)), right),
 
-	
+		new(_tier3slot0, scaled_bitmap(image('./resources/tier3.jpg'))),
+	new(_tier2slot0, scaled_bitmap(image('./resources/tier2.jpg'))),
+	new(_tier1slot0, scaled_bitmap(image('./resources/tier1.jpg'))),
+	send(_tier3slot0, scale, _cardSize),
+	send(_tier2slot0, scale, _cardSize),
+	send(_tier1slot0, scale, _cardSize),
+	send(@tier3slot0, append, _tier3slot0),
+	send(@tier2slot0, append, _tier2slot0),
+	send(@tier1slot0, append, _tier1slot0),
+
+	!.
+
+create_token_area :-
+	token_edge(_tokenEdge),
 
 	send(@board, append, new(_tokens, dialog_group('Tokens', box)), right),
+	send(_tokens, gap, size(_tokenEdge / 10, _tokenEdge / 10)),
+	send(_tokens, size, size(_tokenEdge * 12 / 10, _tokenEdge * 67 / 10)),
+	_tokenSize = size(_tokenEdge, _tokenEdge),
 
-	send(_tokens, append, new(_tokenWhite, label(text, '7')), next_row),
-	send(_tokens, append, new(_tokenBlue, label(text, '7')), next_row),
-	send(_tokens, append, new(_tokenGreen, label(text, '7')), next_row),
-	send(_tokens, append, new(_tokenRed, label(text, '7')), next_row),
-	send(_tokens, append, new(_tokenBlack, label(text, '7')), next_row),
-	send(_tokens, append, new(_tokenYellow, label(text, '5')), next_row),	
+	send(_tokens, append, new(@token1, dialog(size, _tokenSize)), next_row),
+	send(_tokens, append, new(@token2, dialog(size, _tokenSize)), next_row),
+	send(_tokens, append, new(@token3, dialog(size, _tokenSize)), next_row),
+	send(_tokens, append, new(@token4, dialog(size, _tokenSize)), next_row),
+	send(_tokens, append, new(@token5, dialog(size, _tokenSize)), next_row),
+	send(_tokens, append, new(@token6, dialog(size, _tokenSize)), next_row).
 
+create_noble_area :-
+	noble_edge(_nobleEdge),
 	send(@board, append, new(_nobles, dialog_group('Nobles', box)), right),
-	
-	send(_nobles, append, new(_noble1, label(text, 'Noble 1')), next_row),
-	send(_nobles, append, new(_noble2, label(text, 'Noble 2')), next_row),
-	send(_nobles, append, new(_noble3, label(text, 'Noble 3')), next_row),
-	send(_nobles, append, new(_noble4, label(text, 'Noble 4')), next_row),
-	send(_nobles, append, new(_noble5, label(text, 'Noble 5')), next_row),
 
+	send(_nobles, gap, size(_nobleEdge / 10, _nobleEdge / 10)),
+	% MAKE THIS VARY WITH NOBLE SIZE, SO: CHANGE 5 TO #NOBLE, 6 TO #NOBLE+1
+	send(_nobles, size, size(_nobleEdge * 12 / 10, _nobleEdge * 56 / 10)),
+	_nobleSize = size(_nobleEdge, _nobleEdge),
+	
+	send(_nobles, append, new(@tier0slot1, dialog(size, _nobleSize)), next_row),
+	send(_nobles, append, new(@tier0slot2, dialog(size, _nobleSize)), next_row),
+	send(_nobles, append, new(@tier0slot3, dialog(size, _nobleSize)), next_row),
+	send(_nobles, append, new(@tier0slot4, dialog(size, _nobleSize)), next_row),
+	send(_nobles, append, new(@tier0slot5, dialog(size, _nobleSize)), next_row).
+
+create_focus_area :-
 	send(@board, append, new(_currentAgent, dialog_group('Current Agent', box)), next_row),
 	
+	_nullTokens = '0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0', % atomic_list_concat([0,0,0,0,0,0], ' / ', X)
 	send(_currentAgent, append, new(_currentAgentScore, label(text, 'Score'))),
 	send(_currentAgent, append, new(_currentAgentChips, label(text, 'Chips: 0/10')), right),
 	send(_currentAgent, append, new(_currentAgentTokens, label(text, _nullTokens)), right),
-	send(_currentAgent, append, new(_currentAgentReserves, label(text, 'Reserves')), right),
-
-
-	send(@board, open),
-	!.
+	send(_currentAgent, append, new(_currentAgentReserves, label(text, 'Reserves')), right).
