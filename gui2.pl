@@ -1,54 +1,58 @@
 :- use_module(library(pce)).
-:- use_module(library(scaledbitmap)).
+:- use_module(library(tabular)).
+:- use_module(library(autowin)).
 
+colour(white).
+colour(red).
+colour(green).
+colour(blue).
+colour(black).
 
-go :-
-	free(@main),
-	free(@myBitmap),
-	new(@main, dialog('')),
-	new(@myBitmap, bitmap('./lowres/1.jpg')),
-	send(@myBitmap, size, size(350, 350)),
-	%send(@myBitmap, layout),
-	send(@main, append, @myBitmap),
-	%resize(@myBitmap, 100, 100),
-	send(@main, open),
-	true.
+go(_tokens, _cards, _score) :-
+	sum_list(_tokens, _tokensTotal),
+	atom_concat(_tokensTotal, ' / 10', _tokensTotalLabel),
+	nth1(1, _tokens, _token1),
+	nth1(2, _tokens, _token2),
+	nth1(3, _tokens, _token3),
+	nth1(4, _tokens, _token4),
+	nth1(5, _tokens, _token5),
+	nth1(6, _tokens, _token6),
 
-resize(Bitmap, W, H) :-
-	get(Bitmap, file, File),
-	new(I2, image(@nil, W, H)),
-	send(I2, draw_in, Bitmap, point(0,0)),
-	send(Bitmap, image, I2).
+	nth1(1, _cards, _card1),
+	nth1(2, _cards, _card2),
+	nth1(3, _cards, _card3),
+	nth1(4, _cards, _card4),
+	nth1(5, _cards, _card5),
 
+	new(P, auto_sized_picture('Table with merged cells')),
+	%new(P, dialog),
+	send(P, display, new(T, tabular)),
+	send(T, border, 0),
+	send(T, cell_spacing, 3),
+	send(T, rules, all),
+	send_list(T,
+		[ append('Score', bold, center),
+			append(_score, bold, center, colspan := 6),
+			next_row,
+			append('#Tokens', bold, center),
+			append(_tokensTotalLabel, bold, center, colspan := 6),
+			next_row,
+			append('Tokens', bold, center),
+			append(_token1, bold, center, background := wheat),
+			append(_token2, bold, center, background := midnightblue, colour := white),
+			append(_token3, bold, center, background := seagreen),
+			append(_token4, bold, center, background := firebrick),
+			append(_token5, bold, center, background := black, colour := white),
+			append(_token6, bold, center, background := gold),
+			next_row,
+			append('Cards', bold, center),
+			append(_card1, bold, center, background := wheat),
+			append(_card2, bold, center, background := midnightblue, colour := white),
+			append(_card3, bold, center, background := seagreen),
+			append(_card4, bold, center, background := firebrick),
+			append(_card5, bold, center, background := black, colour := white),
+			append('0', bold, center, background := gold)
+		]),
+	send(P, open).
 
-test :-
-  new(@sd,dialog('Dialog Test')),
-  send(@sd,append,button(quit,message(@prolog,doquit))),
-  send(@sd,append,new(@pic,picture(box))),
-  send(@pic,width(450)),
-  send(@pic,height(130)),
-  send(@sd, open).
-
-redrawpic :-    
-  get(@sd,width,W),
-  W1 is W - 30,
-  get(@pic,height,H),
-  H1 is H + 6,
-  send(@pic,free),
-  send(@sd,append,new(@pic,picture(box,size(W1,H1)))),
-  %send(new(P, picture), below, @sd),
-  send(@sd,layout).
-
-
- mert :-
-	(free(@frame);true),
-	(free(@testBitmap);true),
-	new(@frame, dialog('Frame Title')),
-
-	new(@testBitmap, scaled_bitmap(image('./resources/206.jpg'))),
-	X = 'frame',
-	send(@X, append, @testBitmap),
-	send(@X, open).
-
-mert2 :-
-	send(@testBitmap, scale, size(350,350)).
+		
