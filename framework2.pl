@@ -1,3 +1,6 @@
+:- use_module(library(pce)).
+:- use_module(library(scaledbitmap)).
+:- use_module(library(tabular)).
 
 :- dynamic tokens/2.
 :- dynamic cards/2.
@@ -7,6 +10,7 @@
 :- dynamic currentAgent/1.
 
 :- include(deck).
+:- include(gui).
 
 agents([agent1, agent2, agent3, agent4]). % Read from file
 
@@ -14,7 +18,6 @@ start() :-
 	initialization(),
 	assert(currentAgent(1)),
 	run().
-
 
 % add logging
 run() :- % WORK WITH AGENT NAMES!
@@ -36,6 +39,10 @@ initialization() :-
 		false),
 	_nNoble is _nAgent + 1,
 
+	create_board(_agents),
+	draw_tokens,
+	update_tokens([_nToken, _nToken, _nToken, _nToken, _nToken, 5]),
+
 	cards(deck1, _deck1),
 	cards(deck2, _deck2),
 	cards(deck3, _deck3),
@@ -44,10 +51,11 @@ initialization() :-
 	list_n_null(4, _null4),
 	list_n_null(_nNoble, _nullNobles),
 
-	draw_n_cards(4, _deck1, _null4, _deck1New, _area1), !,
-	draw_n_cards(4, _deck2, _null4, _deck2New, _area2), !,
-	draw_n_cards(4, _deck3, _null4, _deck3New, _area3), !,
-	draw_n_cards(_nNoble, _nobles, _nullNobles, _, _noblesNew), !,
+	write(_deck1), nl,
+	draw_n_cards(4, 1, _deck1, _null4, _deck1New, _area1), !,
+	draw_n_cards(4, 2, _deck2, _null4, _deck2New, _area2), !,
+	draw_n_cards(4, 3, _deck3, _null4, _deck3New, _area3), !,
+	draw_n_cards(_nNoble, 0, _nobles, _nullNobles, _, _noblesNew), !,
 
 	% Reset DB with retractall???
 	(retract(cards(deck1, _)); true),
@@ -66,13 +74,15 @@ initialization() :-
 	assert(cards(area2, _area2)), !,
 	assert(cards(area3, _area3)), !,
 	assert(nobles(board, _noblesNew)), !,
-	assert(tokens(board, [_nToken, _nToken, _nToken, _nToken, _nToken, 3])), !,
+	assert(tokens(board, [_nToken, _nToken, _nToken, _nToken, _nToken, 5])), !,
 	forall(between(1, _nAgent, _n),
 		(
 			atom_concat(agent, _n, _agent),
 			assert(tokens(_agent, [0, 0, 0, 0, 0, 0])), !,
 			assert(cards(_agent, [])), !,
 			assert(reserves(_agent, [])), !,
+			update_scoreboard_table(_n, [0, 0, 0, 0, 0, 0],
+				[0, 0, 0, 0, 0, 0], 0),
 
 			% nth1(PlayerNo, PlayerModules, PlayerModule)
 			% atom_concat('players/', PlayerModule, PlayerModuleFile)
@@ -85,22 +95,18 @@ initialization() :-
 
 	true. % remove this line
 
-
-%	set_tokens(),
-%	set_decks(),
-%	draw_cards_from_deck_to_area(),
-%	draw_nobles(),
-%	set_player_tokens(),
-%	set_player_cards().
-
-
-draw_n_cards(_, [], To, [], To) :- !.
-draw_n_cards(0, From, To, From, To) :- !.
-draw_n_cards(N, From, To, Rest, Result) :-
+draw_n_cards(_, _, [], To, [], To) :- !.
+draw_n_cards(0, _, From, To, From, To) :- !.
+draw_n_cards(N, Tier, From, To, Rest, Result) :-
 	N > 0, M is N-1,
-	(random_select(Card, From, Remainder) -> 
-		(select(null, To, Card, Acc), draw_n_cards(M, Remainder, Acc, Rest, Result));
-		true). % check if deck is empty, add true and do nothing?
+	random_select(Card, From, Remainder),
+	nth1(1, Card, CardId),
+	nth1(Index, To, null),
+	select(null, To, Card, Acc),
+	update_card(CardId, Tier, Index),
+	write(CardId), write(' '), write(Tier), write(' '), write(Index), nl,
+	draw_n_cards(M, Tier, Remainder, Acc, Rest, Result),
+	!.
 
 list_n_null(0, []) :- !.
 list_n_null(1, [null]) :- !.
@@ -222,7 +228,7 @@ purchase_card(_agent, [_tier, _position]) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	assert(tokens(_agent, _tokensAgentNew)),
 
 	select(_card, _cardsArea, null, _cardsAreaTemp),
-	draw_n_cards(1, _cardsDeck, _cardsAreaTemp, _cardsDeckNew, _cardsAreaNew),
+	draw_n_cards(1, _tier, _cardsDeck, _cardsAreaTemp, _cardsDeckNew, _cardsAreaNew),
 
 	retract(cards(_area, _)),
 	assert(cards(_area, _cardsAreaNew)),

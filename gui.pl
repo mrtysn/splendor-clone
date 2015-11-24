@@ -1,46 +1,22 @@
-:- use_module(library(pce)).
-:- use_module(library(scaledbitmap)).
-:- use_module(library(tabular)).
+
 
 card_edge(200).
 noble_edge(120).
 token_edge(80).
 area_size(size(160, 100)).
 
-test :-
-	draw_tokens,
-	update_scoreboard_table(1, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-	update_scoreboard_table(2, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-	update_scoreboard_table(3, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-	update_scoreboard_table(4, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-
-	update_card(501, 0, 1),
-	update_card(502, 0, 2),
-	update_card(503, 0, 3),
-	update_card(504, 0, 4),
-	update_card(505, 0, 5),
-
-	update_card(201, 3, 1),
-	update_card(202, 3, 2),
-	update_card(203, 3, 3),
-	update_card(204, 3, 4),
-
-	update_card(101, 2, 1),
-	update_card(102, 2, 2),
-	update_card(103, 2, 3),
-	update_card(104, 2, 4),
-
-	update_card(1, 1, 1),
-	update_card(2, 1, 2),
-	update_card(3, 1, 3),
-	update_card(4, 1, 4),
-
-	mark_card(3,0),
-
-	!.
 
 update_tokens(_tokens) :-
-	send(@token1count, text, 'Test').
+	foreach((between(1, 6, _index), 
+		atomic_list_concat(['token', _index, 'count'], _reference),
+		nth1(_index, _tokens, _newToken),
+		atom_concat('\n', _newToken, _newTokenLabel)
+		), 
+		(	
+			send(@_reference, selection, _newTokenLabel)
+		)),
+	!.
+
 
 draw_tokens :-
 	token_edge(_tokenEdge),
@@ -60,7 +36,7 @@ draw_tokens :-
 mark_card(_tier, _position) :-
 	atomic_list_concat(['tier', _tier, 'slot', _position], _reference),
 	get(@_reference, member, scaled_bitmap, _card),
-	send_list(_card, [pen(5), colour(brown)]),
+	send_list(_card, [pen(5), colour(green)]),
 	!.
 
 unmark_card(_tier, _position) :-
@@ -180,10 +156,10 @@ free_handles() :-
 	(free(@board);true),
 	!.
 
-draw :-
+create_board(_agents) :-
 	free_handles(),
 	new(@board, dialog('Splendor')),
-	create_scoreboard([mert, gok, noob, pro]),
+	create_scoreboard(_agents),
 	create_card_area,
 	create_token_area,
 	create_noble_area,
@@ -191,21 +167,55 @@ draw :-
 	send(@board, open),
 	!.
 
+test :-
+	
+	update_scoreboard_table(1, [0,0,0,0,0,0], [0,0,0,0,0], 0),
+	update_scoreboard_table(2, [0,0,0,0,0,0], [0,0,0,0,0], 0),
+	update_scoreboard_table(3, [0,0,0,0,0,0], [0,0,0,0,0], 0),
+	update_scoreboard_table(4, [0,0,0,0,0,0], [0,0,0,0,0], 0),
+
+	update_card(501, 0, 1),
+	update_card(502, 0, 2),
+	update_card(503, 0, 3),
+	update_card(504, 0, 4),
+	update_card(505, 0, 5),
+
+	update_card(201, 3, 1),
+	update_card(202, 3, 2),
+	update_card(203, 3, 3),
+	update_card(204, 3, 4),
+
+	update_card(101, 2, 1),
+	update_card(102, 2, 2),
+	update_card(103, 2, 3),
+	update_card(104, 2, 4),
+
+	update_card(1, 1, 1),
+	update_card(2, 1, 2),
+	update_card(3, 1, 3),
+	update_card(4, 1, 4),
+
+	mark_card(3,0),
+
+	!.
+
 create_scoreboard(_agents) :-
 	area_size(_areaSize),
 	length(_agents, _length),
 
-	send(@board, append, new(_scoreBoard, dialog_group('Score Board', group))),
-
+	send(@board, append, new(_scoreBoard, dialog_group('Score Board', group)), next_row),
+	% MARK PLAYER FRAMES WITH PEN
 	foreach((between(1, _length, _index), 
 		atomic_list_concat(['agent', _index, 'area'], _agentArea),
 		nth1(_index, _agents, _agentName),
 		send(_scoreBoard, append, new(_area, dialog_group(_agentName, box)))
 		), 
 		(
-			
 			send(_area, append, new(@_agentArea, dialog(size, _areaSize)), next_row)
 		)),
+	%new(_logo, scaled_bitmap(image('./resources/lgo_Splendor.xpm'))),
+	%send(_logo, scale, size(180, 72)),
+	%send(_scoreBoard, append, _logo, next_row),
 	!.
 
 create_card_area :-
@@ -247,8 +257,7 @@ create_card_area :-
 	new(_tier3slot0, scaled_bitmap(image('./resources/tier3.jpg'))),
 	new(_tier2slot0, scaled_bitmap(image('./resources/tier2.jpg'))),
 	new(_tier1slot0, scaled_bitmap(image('./resources/tier1.jpg'))),
-	%send(_tier2slot0, scale, _cardSize),
-	%send(_tier1slot0, scale, _cardSize),
+	
 	send(@tier3slot0, append, _tier3slot0),
 	send(@tier2slot0, append, _tier2slot0),
 	send(@tier1slot0, append, _tier1slot0),
@@ -261,31 +270,28 @@ create_token_area :-
 	send(@board, append, new(_tokens, dialog_group('Tokens', box)), right),
 	send(_tokens, gap, size(_tokenEdge / 10, _tokenEdge / 10)),
 	send(_tokens, size, size(_tokenEdge * 23 / 10, _tokenEdge * 67 / 10)),
+	
 	_tokenSize = size(_tokenEdge, _tokenEdge),
 
-	send(_tokens, append, new(@token1, dialog(size, _tokenSize)), next_row),
-	send(_tokens, append, new(_token1box, dialog(size, _tokenSize)), right),
-	send(_token1box, append, new(@token1count, label(text, '\n 0'))),
+	foreach(
+		(
+			between(1, 6, _index),
+			atomic_list_concat(['./resources/tokens/token', _index, '.jpg'], _path),
+			atomic_list_concat(['token', _index], _tokeni),
+			atomic_list_concat(['token', _index, 'count'], _tokenicount),
+			new(_tokenBitmap, scaled_bitmap(image(_path))),
+			send(_tokens, append, new(@_tokeni, dialog(size, _tokenSize)), next_row),			
+			send(_tokens, append, new(_tokencount, dialog(size, _tokenSize)), right),
+			send(_tokencount, append, new(@_tokenicount, label(text, '\n 0')))
+			),
+		(
+			true
+			)
+		),
+	!.
+
+	%draw_tokens.
 	
-	send(_tokens, append, new(@token2, dialog(size, _tokenSize)), next_row),
-	send(_tokens, append, new(_token2box, dialog(size, _tokenSize)), right),
-	send(_token2box, append, new(@token2count, label(text, '\n 0'))),
-	
-	send(_tokens, append, new(@token3, dialog(size, _tokenSize)), next_row),
-	send(_tokens, append, new(_token3box, dialog(size, _tokenSize)), right),
-	send(_token3box, append, new(@token3count, label(text, '\n 0'))),
-
-	send(_tokens, append, new(@token4, dialog(size, _tokenSize)), next_row),
-	send(_tokens, append, new(_token4box, dialog(size, _tokenSize)), right),
-	send(_token4box, append, new(@token4count, label(text, '\n 0'))),
-
-	send(_tokens, append, new(@token5, dialog(size, _tokenSize)), next_row),
-	send(_tokens, append, new(_token5box, dialog(size, _tokenSize)), right),
-	send(_token5box, append, new(@token5count, label(text, '\n 0'))),
-
-	send(_tokens, append, new(@token6, dialog(size, _tokenSize)), next_row),
-	send(_tokens, append, new(_token6box, dialog(size, _tokenSize)), right),
-	send(_token6box, append, new(@token6count, label(text, '\n 0'))).
 
 create_noble_area :-
 	noble_edge(_nobleEdge),
