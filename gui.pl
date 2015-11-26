@@ -26,13 +26,13 @@ draw_tokens :-
 
 % cyan, magenta, yellow, white, purple, brown
 
-mark_card(_tier, _position) :-
+mark_card([_tier, _position]) :-
 	atomic_list_concat(['tier', _tier, 'slot', _position], _reference),
 	get(@_reference, member, scaled_bitmap, _card),
 	send_list(_card, [pen(5), colour(green)]),
 	!.
 
-unmark_card(_tier, _position) :-
+unmark_card([_tier, _position]) :-
 	atomic_list_concat(['tier', _tier, 'slot', _position], _reference),
 	get(@_reference, member, scaled_bitmap, _card),
 	send_list(_card, [pen(0)]),
@@ -76,7 +76,7 @@ update_scoreboard_table(_agentId, _tokens, _cards, _score) :-
 	send(_table, cell_spacing, 3),
 	send(_table, rules, all),
 	send_list(_table,
-		[ append('Score', bold, center),
+		[	append('Score', bold, center),
 			append(_score, bold, center, colspan := 6),
 			next_row,
 			append('#Tokens', bold, center),
@@ -210,9 +210,6 @@ create_scoreboard(_agents) :-
 		(
 			send(_area, append, new(@_agentArea, dialog(size, _areaSize)), next_row)
 		)),
-	%new(_logo, scaled_bitmap(image('./resources/lgo_Splendor.xpm'))),
-	%send(_logo, scale, size(180, 72)),
-	%send(_scoreBoard, append, _logo, next_row),
 	!.
 
 create_card_area :-
