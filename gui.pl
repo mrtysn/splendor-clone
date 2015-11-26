@@ -1,21 +1,14 @@
-
+:- use_module(library(scaledbitmap)).
+:- use_module(library(tabular)).
 
 card_edge(200).
 noble_edge(120).
 token_edge(80).
 area_size(size(160, 100)).
+font_size(72).
 
 
-update_tokens(_tokens) :-
-	foreach((between(1, 6, _index), 
-		atomic_list_concat(['token', _index, 'count'], _reference),
-		nth1(_index, _tokens, _newToken),
-		atom_concat('\n', _newToken, _newTokenLabel)
-		), 
-		(	
-			send(@_reference, selection, _newTokenLabel)
-		)),
-	!.
+
 
 
 draw_tokens :-
@@ -90,19 +83,19 @@ update_scoreboard_table(_agentId, _tokens, _cards, _score) :-
 			append(_tokensTotalLabel, bold, center, colspan := 6),
 			next_row,
 			append('Tokens', bold, center),
-			append(_token1, bold, center, background := wheat),
+			append(_token1, bold, center, background := white),
 			append(_token2, bold, center, background := midnightblue, colour := white),
-			append(_token3, bold, center, background := seagreen),
-			append(_token4, bold, center, background := firebrick),
-			append(_token5, bold, center, background := black, colour := white),
+			append(_token3, bold, center, background := forestgreen, colour := white),
+			append(_token4, bold, center, background := firebrick, colour := white),
+			append(_token5, bold, center, background := sienna, colour := white),
 			append(_token6, bold, center, background := gold),
 			next_row,
 			append('Cards', bold, center),
-			append(_card1, bold, center, background := wheat),
+			append(_card1, bold, center, background := white),
 			append(_card2, bold, center, background := midnightblue, colour := white),
-			append(_card3, bold, center, background := seagreen),
-			append(_card4, bold, center, background := firebrick),
-			append(_card5, bold, center, background := black, colour := white),
+			append(_card3, bold, center, background := forestgreen, colour := white),
+			append(_card4, bold, center, background := firebrick, colour := white),
+			append(_card5, bold, center, background := sienna, colour := white),
 			append('0', bold, center, background := gold)
 		]),
 	((get(@_reference, member, tabular, _currentTable), free(_currentTable));true),
@@ -159,12 +152,16 @@ free_handles() :-
 create_board(_agents) :-
 	free_handles(),
 	new(@board, dialog('Splendor')),
+	send(@board, cursor, hand1),
+	send(@board, icon, new(_, bitmap('./resources/splendor_icon.xpm'))),
 	create_scoreboard(_agents),
 	create_card_area,
 	create_token_area,
 	create_noble_area,
 	create_focus_area,
 	send(@board, open),
+	draw_tokens,
+	create_tier_images,
 	!.
 
 test :-
@@ -254,14 +251,24 @@ create_card_area :-
 	send(_tier1, append, new(@tier1slot3, dialog(size, _cardSize)), right),
 	send(_tier1, append, new(@tier1slot4, dialog(size, _cardSize)), right),
 
-	new(_tier3slot0, scaled_bitmap(image('./resources/tier3.jpg'))),
-	new(_tier2slot0, scaled_bitmap(image('./resources/tier2.jpg'))),
-	new(_tier1slot0, scaled_bitmap(image('./resources/tier1.jpg'))),
+	
+	!.
+
+create_tier_images :-
+	card_edge(_cardEdge),
+	_cardSize = size(_cardEdge, _cardEdge),
+	
+	new(_tier3slot0, scaled_bitmap(image('./resources/tier3_2.jpg'))),
+	new(_tier2slot0, scaled_bitmap(image('./resources/tier2_2.jpg'))),
+	new(_tier1slot0, scaled_bitmap(image('./resources/tier1_2.jpg'))),
+
+	send(_tier3slot0, scale, _cardSize),
+	send(_tier2slot0, scale, _cardSize),
+	send(_tier1slot0, scale, _cardSize),
 	
 	send(@tier3slot0, append, _tier3slot0),
 	send(@tier2slot0, append, _tier2slot0),
 	send(@tier1slot0, append, _tier1slot0),
-
 	!.
 
 create_token_area :-
@@ -271,18 +278,14 @@ create_token_area :-
 	send(_tokens, gap, size(_tokenEdge / 10, _tokenEdge / 10)),
 	send(_tokens, size, size(_tokenEdge * 23 / 10, _tokenEdge * 67 / 10)),
 	
-	_tokenSize = size(_tokenEdge, _tokenEdge),
-
 	foreach(
 		(
 			between(1, 6, _index),
-			atomic_list_concat(['./resources/tokens/token', _index, '.jpg'], _path),
 			atomic_list_concat(['token', _index], _tokeni),
 			atomic_list_concat(['token', _index, 'count'], _tokenicount),
-			new(_tokenBitmap, scaled_bitmap(image(_path))),
-			send(_tokens, append, new(@_tokeni, dialog(size, _tokenSize)), next_row),			
-			send(_tokens, append, new(_tokencount, dialog(size, _tokenSize)), right),
-			send(_tokencount, append, new(@_tokenicount, label(text, '\n 0')))
+			send(_tokens, append, new(@_tokeni, dialog(size, size(_tokenEdge * 13 / 10, _tokenEdge))), next_row),
+			send(_tokens, append, new(@_tokenicount, dialog(size, size(_tokenEdge * 7 / 10, _tokenEdge))), right),
+			true
 			),
 		(
 			true
@@ -290,8 +293,81 @@ create_token_area :-
 		),
 	!.
 
-	%draw_tokens.
+update_tokens(_tokens) :-
+	font_size(_fontSize),
+
+	nth1(1, _tokens, _token1),
+	((get(@token1count, member, text, _currentToken1), free(_currentToken1));true),
+	new(_token1text, text(_token1)),
+	send(_token1text, font, font(screen, bold, _fontSize)),
+	send(_token1text, colour, white),
+	send(@token1count, append, _token1text),
+
+	nth1(2, _tokens, _token2),
+	((get(@token2count, member, text, _currentToken2), free(_currentToken2));true),
+	new(_token2text, text(_token2)),
+	send(_token2text, font, font(screen, bold, _fontSize)),
+	send(_token2text, colour, midnightblue),
+	send(@token2count, append, _token2text),
+
+	nth1(3, _tokens, _token3),
+	((get(@token3count, member, text, _currentToken3), free(_currentToken3));true),
+	new(_token3text, text(_token3)),
+	send(_token3text, font, font(screen, bold, _fontSize)),
+	send(_token3text, colour, forestgreen),
+	send(@token3count, append, _token3text),
+
+	nth1(4, _tokens, _token4),
+	((get(@token4count, member, text, _currentToken4), free(_currentToken4));true),
+	new(_token4text, text(_token4)),
+	send(_token4text, font, font(screen, bold, _fontSize)),
+	send(_token4text, colour, firebrick),
+	send(@token4count, append, _token4text),
+
+	nth1(5, _tokens, _token5),
+	((get(@token5count, member, text, _currentToken5), free(_currentToken5));true),
+	new(_token5text, text(_token5)),
+	send(_token5text, font, font(screen, bold, _fontSize)),
+	send(_token5text, colour, sienna),
+	send(@token5count, append, _token5text),
+
+	nth1(6, _tokens, _token6),
+	((get(@token6count, member, text, _currentToken6), free(_currentToken6));true),
+	new(_token6text, text(_token6)),
+	send(_token6text, font, font(screen, bold, _fontSize)),
+	send(_token6text, colour, gold),
+	send(@token6count, append, _token6text),
+
+	!.
+
+write_card_left(0, _).
+write_card_left(_tier, 0) :-
+	font_size(_fontSize), card_edge(_cardEdge),
+
+	atomic_list_concat(['tier', _tier, 'slot0'], _reference),
+
+	((get(@_reference, member, scaled_bitmap, _currentCard), free(_currentCard));true),
+	new(_card, scaled_bitmap(image('./resources/tier0_2.jpg'))),
+	send(_card, scale, size(_cardEdge, _cardEdge)),
 	
+	send(@_reference, append, _card),
+
+	((get(@_reference, member, text, _currentCount), free(_currentCount));true),
+	new(_text, text('00')),
+	send(_text, font, font(screen, bold, _fontSize)),
+	send(_text, colour, firebrick),
+	send(@_reference, display, _text, point(_cardEdge * 3 / 10, _cardEdge * 3 / 10)),
+	!.
+write_card_left(_tier, _cardCount) :-
+	font_size(_fontSize), card_edge(_cardEdge),
+	atomic_list_concat(['tier', _tier, 'slot0'], _reference),
+	((get(@_reference, member, text, _currentCount), free(_currentCount));true),
+	(_cardCount < 10 -> atom_concat('0', _cardCount, _cardText);_cardText = _cardCount),
+	new(_text, text(_cardText)),
+	send(_text, font, font(screen, bold, _fontSize)),
+	send(_text, colour, firebrick),
+	send(@_reference, display, _text, point(_cardEdge * 3 / 10, _cardEdge * 3 / 10)),
+	!.	
 
 create_noble_area :-
 	noble_edge(_nobleEdge),
@@ -309,10 +385,11 @@ create_noble_area :-
 	send(_nobles, append, new(@tier0slot5, dialog(size, _nobleSize)), next_row).
 
 create_focus_area :-
-	send(@board, append, new(_currentAgent, dialog_group('Current Agent', box)), next_row),
+	%send(@board, append, new(_currentAgent, dialog_group('Current Agent', box)), next_row),
 	
-	_nullTokens = '0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0', % atomic_list_concat([0,0,0,0,0,0], ' / ', X)
-	send(_currentAgent, append, new(_currentAgentScore, label(text, 'asd \u2460 asd'))),
-	send(_currentAgent, append, new(_currentAgentChips, label(text, 'Chips: 0/10')), right),
-	send(_currentAgent, append, new(_currentAgentTokens, label(text, _nullTokens)), right),
-	send(_currentAgent, append, new(_currentAgentReserves, label(text, 'Reserves')), right).
+	%_nullTokens = '0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0 : 0 / 0', % atomic_list_concat([0,0,0,0,0,0], ' / ', X)
+	%send(_currentAgent, append, new(_currentAgentScore, label(text, 'Score: 0'))),
+	%send(_currentAgent, append, new(_currentAgentChips, label(text, 'Chips: 0/10')), right),
+	%send(_currentAgent, append, new(_currentAgentTokens, label(text, _nullTokens)), right),
+	%send(_currentAgent, append, new(_currentAgentReserves, label(text, 'Reserves')), right),
+	true.

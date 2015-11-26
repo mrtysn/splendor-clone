@@ -1,6 +1,5 @@
 :- use_module(library(pce)).
-:- use_module(library(scaledbitmap)).
-:- use_module(library(tabular)).
+
 
 :- dynamic tokens/2.
 :- dynamic cards/2.
@@ -40,7 +39,7 @@ initialization() :-
 	_nNoble is _nAgent + 1,
 
 	create_board(_agents),
-	draw_tokens,
+	
 	update_tokens([_nToken, _nToken, _nToken, _nToken, _nToken, 5]),
 
 	cards(deck1, _deck1),
@@ -51,7 +50,6 @@ initialization() :-
 	list_n_null(4, _null4),
 	list_n_null(_nNoble, _nullNobles),
 
-	write(_deck1), nl,
 	draw_n_cards(4, 1, _deck1, _null4, _deck1New, _area1), !,
 	draw_n_cards(4, 2, _deck2, _null4, _deck2New, _area2), !,
 	draw_n_cards(4, 3, _deck3, _null4, _deck3New, _area3), !,
@@ -100,11 +98,12 @@ draw_n_cards(0, _, From, To, From, To) :- !.
 draw_n_cards(N, Tier, From, To, Rest, Result) :-
 	N > 0, M is N-1,
 	random_select(Card, From, Remainder),
+	proper_length(Remainder, CardsLeft),
 	nth1(1, Card, CardId),
 	nth1(Index, To, null),
 	select(null, To, Card, Acc),
 	update_card(CardId, Tier, Index),
-	write(CardId), write(' '), write(Tier), write(' '), write(Index), nl,
+	write_card_left(Tier, CardsLeft),
 	draw_n_cards(M, Tier, Remainder, Acc, Rest, Result),
 	!.
 
@@ -179,17 +178,47 @@ take_tokens(_agent, _tokens) :- % #token > 10 ise return tokens until #token = 1
 		false
 	), !,
 
+	_tokensBoardNew = [_whiteLeft, _blueLeft, _greenLeft, _redLeft, _blackLeft, _yellowBoard],
 	retract(tokens(board, _)),
-	assert(tokens(board, [_whiteLeft, _blueLeft, _greenLeft, _redLeft, _blackLeft, _yellowBoard])),
+	assert(tokens(board, _tokensBoardNew)),
 
 	tokens(_agent, _tokensAgent),
 	last(_tokensAgent, _yellowAgent),
 	append(_tokens, [_yellowAgent], _tokensWithYellow),
 	maplist(plus, _tokensAgent, _tokensWithYellow, _tokensAgentNew),
 	retract(tokens(_agent, _)),
-	assert(tokens(_agent, _tokensAgentNew)).
+	assert(tokens(_agent, _tokensAgentNew)),
 
-purchase_card(_agent, [_tier, _position]) :- % DO NOT FORGET ABOUT YELLOW TOKENS
+	update_tokens(_tokensBoardNew),
+	update_scores_agent(_agent),
+	true.
+
+update_scores_agent(_agentName) :-
+	agents(_agents),
+	nth1(_agentId, _agents, _agentName),
+	tokens(_agentName, _tokens),
+	cards(_agentName, _cards),
+	calculate_card_wealth(_cards, _cardWealth),
+	calculate_score(_agentName, _score),
+	update_scoreboard_table(_agentId, _tokens, _cardWealth, _score).
+
+calculate_score(_agentName, _score) :-
+	cards(_agentName, _cards),
+	maplist(nth1(2), _cards, _scores),
+	% ADD NOBLES SCORE
+	sum_list(_scores, _score).
+
+calculate_card_wealth(_cards, _wealth) :-
+	maplist(nth1(3), _cards, _colors),
+	aggregate_all(count, member('white', _colors), _whiteCards),
+	aggregate_all(count, member('blue', _colors), _blueCards),
+	aggregate_all(count, member('green', _colors), _greenCards),
+	aggregate_all(count, member('red', _colors), _redCards),
+	aggregate_all(count, member('black', _colors), _blackCards),
+	_wealth = [_whiteCards, _blueCards, _greenCards, _redCards, _blackCards, 0]
+	.
+
+purchase_card(_agentName, [_tier, _position]) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	between(1, 3, _tier),
 	between(1, 4, _position),
 
@@ -198,21 +227,15 @@ purchase_card(_agent, [_tier, _position]) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	
 	cards(_area, _cardsArea),
 	cards(_deck, _cardsDeck),
-	cards(_agent, _cardsAgent),
-	tokens(_agent, _tokensAgent),
+	cards(_agentName, _cardsAgent),
+	tokens(_agentName, _tokensAgent),
 
 	nth1(_position, _cardsArea, _card),
 	append([_,_,_], _cardCostTemp, _card),
 	append(_cardCostTemp, [0], _cardCost),
 	
-	maplist(nth1(3), _cardsAgent, _cardsAgentColors),
-	aggregate_all(count, member('white', _cardsAgentColors), _whiteCards),
-	aggregate_all(count, member('blue', _cardsAgentColors), _blueCards),
-	aggregate_all(count, member('green', _cardsAgentColors), _greenCards),
-	aggregate_all(count, member('red', _cardsAgentColors), _redCards),
-	aggregate_all(count, member('black', _cardsAgentColors), _blackCards),
-	_developmentsAgent = [_whiteCards, _blueCards, _greenCards, _redCards, _blackCards, 0],
-		% YELLOW TOKENS ARE ZERO HERE, CHECK FROM AGENT TOKENS!
+	calculate_card_wealth(_cardsAgent, _developmentsAgent),
+	% YELLOW TOKENS ARE ZERO HERE, CHECK FROM AGENT TOKENS!
 	maplist(plus, _tokensAgent, _developmentsAgent, _wealthAgent),
 	maplist(plus, _cardCost, _leftoverAgent, _wealthAgent),
 	maplist(between(0, infinite), _leftoverAgent), % affordance check
@@ -220,12 +243,20 @@ purchase_card(_agent, [_tier, _position]) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	maplist(plus, _developmentsAgent, _surplusTemp, _cardCost),
 	negative_to_zero(_surplusTemp, _surplus),
 	maplist(plus, _tokensAgentNew, _surplus, _tokensAgent),
-	append(_cardsAgent, _card, _cardsAgentNew),
+
+	tokens(board, _tokensBoard),
+	maplist(plus, _tokensBoard, _cardCost, _tokensBoardNew),
+
+
+	append(_cardsAgent, [_card], _cardsAgentNew),
+	retract(cards(_agentName, _)),
+	assert(cards(_agentName, _cardsAgentNew)),
 	
-	retract(cards(_agent, _)),
-	assert(cards(_agent, _cardsAgentNew)),
-	retract(tokens(_agent, _)),
-	assert(tokens(_agent, _tokensAgentNew)),
+	retract(tokens(_agentName, _)),
+	assert(tokens(_agentName, _tokensAgentNew)),
+	retract(tokens(board, _)),
+	assert(tokens(board, _tokensBoardNew)),
+	update_tokens(_tokensBoardNew),
 
 	select(_card, _cardsArea, null, _cardsAreaTemp),
 	draw_n_cards(1, _tier, _cardsDeck, _cardsAreaTemp, _cardsDeckNew, _cardsAreaNew),
@@ -233,9 +264,10 @@ purchase_card(_agent, [_tier, _position]) :- % DO NOT FORGET ABOUT YELLOW TOKENS
 	retract(cards(_area, _)),
 	assert(cards(_area, _cardsAreaNew)),
 	retract(cards(_deck, _)),
-	assert(cards(_deck, _cardsDeckNew)).
+	assert(cards(_deck, _cardsDeckNew)),
+	update_scores_agent(_agentName).
 
-reserve_card(_agent, [_tier, _position]) :- !.
+%reserve_card(_agentName, [_tier, _position]) :- !.
 
 
 negative_to_zero([], []) :- !.
@@ -254,20 +286,20 @@ game_did_not_end() :- !.
 next_agent() :- !.
 
 
-ask_action(_agent, _actionType, _actionParameters) :-
+ask_action(_agentName, _actionType, _actionParameters) :-
 	print_board(),
-	write('I am agent: '), write(_agent), nl,
+	write('I am agent: '), write(_agentName), nl,
   	write('Action?'), nl,
 	read(_actionType),
 	write('Parameters?'), nl,
 	read(_actionParameters).
 
 
-apply_action(_agent, _actionType, _actionParameters) :-
+apply_action(_agentName, _actionType, _actionParameters) :-
 	between(1, 3, _actionType),
-	(	_actionType = 1 -> take_tokens(_agent, _actionParameters);
-		_actionType = 2 -> purchase_card(_agent, _actionParameters);
-		_actionType = 3 -> reserve_card(_agent, _actionParameters);
+	(	_actionType = 1 -> take_tokens(_agentName, _actionParameters);
+		_actionType = 2 -> purchase_card(_agentName, _actionParameters);
+		_actionType = 3 -> reserve_card(_agentName, _actionParameters);
 		false).
 
 
