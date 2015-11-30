@@ -22,14 +22,60 @@ start() :-
 run() :- % WORK WITH AGENT NAMES!
 	game_did_not_end(),
 	agents(_agents),
-	currentAgent(_agent),
-	nth1(_agent, _agents, _agentName),
+	currentAgent(_agentId),
+	nth1(_agentId, _agents, _agentName),
+	get_affordable_cards(_agentName, _cardsAffordable),
+	mark_affordable_cards(_cardsAffordable),
+	get_affordable_reserves(_agentName, _reservesAffordable),
+	mark_affordable_reserves(_agentId, _reservesAffordable),
 	ask_action(_agentName, _actionType, _actionParameters), % pas geçme opsiyonu
-	apply_action(_agentName, _actionType, _actionParameters),
+	apply_action(_agentName, _cardsAffordable, _actionType, _actionParameters),
 	% check token over draw
-	% check nobles
+	
+	get_affordable_nobles(_agentName, _noblesAffordable),
+	choose_noble(_agentName, _noblesAffordable, _noble),
+	visit_agent(_agentName, _noble),
+
 	next_agent(),
 	run().
+
+visit_agent(_, @nil).
+visit_agent(_agentName, _noble) :-
+	nobles(board, _noblesBoard),
+	nobles(_agentName, _noblesAgent),
+	select(_noble, _noblesBoard, null, _noblesBoardNew),
+	append(_noblesAgent, [_noble], _noblesAgentNew),
+	retract(nobles(board, _)),
+	assert(nobles(board, _noblesBoardNew)), !,
+	retract(nobles(_agentName, _)),
+	assert(nobles(_agentName, _noblesAgentNew)), !,
+	nth1(_i, _noblesBoard, _noble),
+	mark_noble(_agentName, _i),
+	!.
+
+choose_noble(_, [], @nil).
+choose_noble(_, [X], X).
+choose_noble(_, _noblesAffordable, _noble) :-
+	random_select(_noble, _noblesAffordable, _).
+
+get_affordable_nobles(_agentName, _noblesAffordable) :-
+	nobles(board, _noblesBoard),
+	cards(_agentName, _cardsAgent),
+	calculate_agent_card_wealth(_cardsAgent, _cardWealth),
+	append(_cardWealthActual, [_], _cardWealth),
+
+	aggregate_all(
+		(bag(_noble)),
+		(
+			member(_noble, _noblesBoard),
+			(\+(_noble = null)),
+			append([_], _nobleCost, _noble),
+			maplist(plus, _nobleCost, _surplus, _cardWealthActual),
+			min_member(_min, _surplus), _min >= 0,
+			true
+		),
+		(_noblesAffordable)
+	), !.
 
 initialization() :-
 	agents(_agents), proper_length(_agents, _nAgent),
@@ -80,8 +126,9 @@ initialization() :-
 			assert(tokens(_agent, [0, 0, 0, 0, 0, 0])), !,
 			assert(cards(_agent, [])), !,
 			assert(reserves(_agent, [])), !,
-			update_scoreboard_table(_n, [0, 0, 0, 0, 0, 0],
-				[0, 0, 0, 0, 0, 0], 0),
+			assert(nobles(_agent, [])), !,
+			update_scoreboard_table(
+				_n, [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], 0),
 
 			% nth1(PlayerNo, PlayerModules, PlayerModule)
 			% atom_concat('players/', PlayerModule, PlayerModuleFile)
@@ -121,7 +168,7 @@ list_n_duplicate(N, X, [X|List]) :-
 	list_n_duplicate(M, X, List).
 
 
-take_tokens(_agent, _tokens) :- % #token > 10 ise return tokens until #token = 10
+take_tokens(_agentName, _tokens) :- % #token > 10 ise return tokens until #token = 10
 	proper_length(_tokens, 5), 
 	min_member(_min, _tokens), _min = 0,
 	
@@ -193,19 +240,18 @@ take_tokens(_agent, _tokens) :- % #token > 10 ise return tokens until #token = 1
 	),
 	!,
 	_tokensBoardNew = [_whiteLeft, _blueLeft, _greenLeft, _redLeft, _blackLeft, _tokensBoardYellow],
-	tokens(_agent, _tokensAgent),
-	last(_tokensAgent, _yellowAgent),
-	append(_tokens, [_yellowAgent], _tokensWithYellow),
+	tokens(_agentName, _tokensAgent),
+	append(_tokens, [0], _tokensWithYellow),
 	maplist(plus, _tokensAgent, _tokensWithYellow, _tokensAgentNew),
 	!,
 	retract(tokens(board, _)),
 	assert(tokens(board, _tokensBoardNew)),
-	retract(tokens(_agent, _)),
-	assert(tokens(_agent, _tokensAgentNew)),
+	retract(tokens(_agentName, _)),
+	assert(tokens(_agentName, _tokensAgentNew)),
 	!,
 	% GUI
 	update_tokens(_tokensBoardNew),
-	update_scores_agent(_agent),
+	update_scores_agent(_agentName),
 	true.
 
 update_scores_agent(_agentName) :-
@@ -243,13 +289,36 @@ card_effective_cost(_agentName, _card, _cardEffectiveCost) :-
 
 	negative_to_zero(_cardEffectiveCostTemp, _cardEffectiveCost).
 
+get_affordable_reserves(_agentName, _cardPositions) :-
+	reserves(_agentName, _reservesAgent),
+	tokens(_agentName, _tokensAgent),
+	cards(_agentName, _cardsAgent),
+	calculate_agent_card_wealth(_cardsAgent, _cardWealthAgent),
+	aggregate_all(
+		(bag(_position)),
+		(
+			nth1(_position, _reservesAgent, _card),
+			append([_,_,_], _cardCostTemp, _card),
+			append(_cardCostTemp, [0], _cardCost),
+			maplist(plus, _cardWealthAgent, _cardEffectiveCostTemp, _cardCost),
+			negative_to_zero(_cardEffectiveCostTemp, _cardEffectiveCost),
+			maplist(plus, _tokensAgent, _surplus, _cardEffectiveCost),
+			negative_to_zero(_surplus, _surplusActual),
+			sum_list(_surplusActual, _yellowTokensNecessary),
+			nth1(6, _tokensAgent, _yellowTokens),
+			_yellowTokensNecessary =< _yellowTokens,
+			true
+		),
+		(_cardPositions)
+	),
+	!.
+
 get_affordable_cards(_agentName, _cardTuples) :-
 	tokens(_agentName, _tokensAgent),
 	cards(_agentName, _cardsAgent),
 	calculate_agent_card_wealth(_cardsAgent, _cardWealthAgent),
 	aggregate_all(
 		(bag([_tier, _position])),
-		(count),
 		(
 			between(1, 3, _tier),
 			between(1, 4, _position),
@@ -261,16 +330,17 @@ get_affordable_cards(_agentName, _cardTuples) :-
 			maplist(plus, _cardWealthAgent, _cardEffectiveCostTemp, _cardCost),
 			negative_to_zero(_cardEffectiveCostTemp, _cardEffectiveCost),
 			maplist(plus, _tokensAgent, _surplus, _cardEffectiveCost),
-			aggregate_all(sum(X), (nth1(I, _surplus, X), I < 6), _yellowTokensNecessary),
-			nth1(6, _surplus, _yellowTokens),
-			0 >= _yellowTokensNecessary + _yellowTokens,
+			negative_to_zero(_surplus, _surplusActual),
+			sum_list(_surplusActual, _yellowTokensNecessary),
+			nth1(6, _tokensAgent, _yellowTokens),
+			_yellowTokensNecessary =< _yellowTokens,
 			true
 		),
 		(_cardTuples)
 	),
 	!.
 
-mark_affordable_cards( _agentName) :-
+mark_affordable_cards(_cardsAffordable) :-
 	aggregate_all(
 		(count),
 		(
@@ -282,44 +352,69 @@ mark_affordable_cards( _agentName) :-
 		(_)
 	),
 	!,
-	get_affordable_cards(_agentName, _cardTuples),
 	aggregate_all(
 		(count),
 		(
-			member(_cardTuple, _cardTuples),
-			mark_card(_cardTuple)
+			member(_card, _cardsAffordable),
+			mark_card(_card)
 		),
 		(_)
 	),
 	!.
 
-purchase_card(_agentName, [_tier, _position, _tokens]) :-
-	tokens(_agentName, _tokensAgent),
-	maplist(plus, _tokens, _tokensDifference, _tokensAgent),
-	maplist(between(0, infinite), _tokensDifference),
+mark_affordable_reserves(_agentId, _reservesAffordable) :-
+	aggregate_all(
+		(count),
+		(
+			between(1, 4, _id),
+			between(1, 3, _position),
+			unmark_reserve(_id, _position)
+		),
+		(_)
+	),
+	!,
+	aggregate_all(
+		(count),
+		(
+			member(_position, _reservesAffordable),
+			mark_reserve(_agentId, _position)
+		),
+		(_)
+	), !.	
 
+purchase_card(_agentName, _cardsAffordable, [_tier, _position, _tokens]) :-
 	between(1, 3, _tier),
 	between(1, 4, _position),
+
+	member([_tier, _position], _cardsAffordable),
 
 	atom_concat(area, _tier, _area),
 	atom_concat(deck, _tier, _deck),
 	
 	cards(_area, _cardsArea),
 	cards(_deck, _cardsDeck),
-	
-	nth1(_position, _cardsArea, _card),
-	card_effective_cost(_agentName, _card, _cardEffectiveCost),
-	
-	maplist(plus, _cardEffectiveCost, _surplus, _tokens),
-	aggregate_all(sum(X), (nth1(I, _surplus, X), I < 6), _yellowTokensNecessary),
-	nth1(6, _surplus, _yellowTokens),
-	0 is _yellowTokens + _yellowTokensNecessary,
 
-	!, % AFFORDANCE CHECK SUCCESSFUL
+	nth1(_position, _cardsArea, _card),
+	append([_,_,_], _cardCostTemp, _card),
+	append(_cardCostTemp, [0], _cardCost),
+	
+	tokens(_agentName, _tokensAgent),
+	cards(_agentName, _cardsAgent),
+	calculate_agent_card_wealth(_cardsAgent, _cardWealthAgent),
+
+	maplist(plus, _cardWealthAgent, _cardEffectiveCostTemp, _cardCost),
+	negative_to_zero(_cardEffectiveCostTemp, _cardEffectiveCost),
+	maplist(plus, _tokens, _surplus, _cardEffectiveCost),
+	negative_to_zero(_surplus, _surplusActual),
+	sum_list(_surplusActual, _yellowTokensNecessary),
+	nth1(6, _tokens, _yellowTokens),
+	_yellowTokensNecessary = _yellowTokens,
+
+	maplist(plus, _tokens, _tokensDifference, _tokensAgent),
 
 	tokens(board, _tokensBoard),
 	maplist(plus, _tokensBoard, _tokens, _tokensBoardNew),
-	cards(_agentName, _cardsAgent),
+	
 	append(_cardsAgent, [_card], _cardsAgentNew),
 	select(_card, _cardsArea, null, _cardsAreaTemp),
 	draw_n_cards(1, _tier, _cardsDeck, _cardsAreaTemp, _cardsDeckNew, _cardsAreaNew),
@@ -343,6 +438,8 @@ purchase_card(_agentName, [_tier, _position, _tokens]) :-
 	update_scores_agent(_agentName).
 
 reserve_card(_agentName, [_tier, _position]) :- 
+	agents(_agents),
+	nth1(_agentId, _agents, _agentName),
 	reserves(_agentName, _reservesAgent),
 	proper_length(_reservesAgent, _reserveCount),
 	(_reserveCount = 3 -> false; true),
@@ -351,20 +448,28 @@ reserve_card(_agentName, [_tier, _position]) :-
 	atom_concat(deck, _tier, _deck),
 	cards(_deck, _cardsDeck),
 	
-	(_position = 0 ->
-		(	append(_reservesAgent, [null], _reservesAgentTemp),
+	((_position = 0) ->
+		(	
+			append(_reservesAgent, [null], _reservesAgentTemp),
 			draw_n_cards(1, _tier, _cardsDeck, _reservesAgentTemp, _cardsDeckNew, _reservesAgentNew),
 			retract(reserves(_agentName, _)),
-			assert(reserves(_agentName, _reservesAgentNew)));
-		(	between(1, 4, _position),
+			assert(reserves(_agentName, _reservesAgentNew))
+		);
+		(	
+			between(1, 4, _position),
 			atom_concat(area, _tier, _area), 	
 			cards(_area, _cardsArea),
 			nth1(_position, _cardsArea, _card),
+			append(_reservesAgent, [_card], _reservesAgentNew),
+			retract(reserves(_agentName, _)),
+			assert(reserves(_agentName, _reservesAgentNew)),
 			select(_card, _cardsArea, null, _cardsAreaTemp),
 			draw_n_cards(1, _tier, _cardsDeck, _cardsAreaTemp, _cardsDeckNew, _cardsAreaNew),
 			retract(cards(_area, _)),
-			assert(cards(_area, _cardsAreaNew)))
+			assert(cards(_area, _cardsAreaNew))
+		)
 	),
+	update_reserves(_agentId, _reservesAgentNew),
 	retract(cards(_deck, _)),
 	assert(cards(_deck, _cardsDeckNew)),
 
@@ -381,11 +486,12 @@ reserve_card(_agentName, [_tier, _position]) :-
 			append(_tokensAgentTemp, [_tokensAgentYellowNew], _tokensAgentNew),
 			retract(tokens(board, _)),
 			assert(tokens(board, _tokensBoardNew)),
+			update_tokens(_tokensBoardNew),
 			retract(tokens(_agentName, _)),
 			assert(tokens(_agentName, _tokensAgentNew)));
 		(	true)
 	),
-
+	update_scores_agent(_agentName),
 	!.
 
 
@@ -414,10 +520,10 @@ ask_action(_agentName, _actionType, _actionParameters) :-
 	read(_actionParameters).
 
 
-apply_action(_agentName, _actionType, _actionParameters) :-
+apply_action(_agentName, _cardsAffordable, _actionType, _actionParameters) :-
 	between(1, 3, _actionType),
 	(	_actionType = 1 -> take_tokens(_agentName, _actionParameters);
-		_actionType = 2 -> purchase_card(_agentName, _actionParameters);
+		_actionType = 2 -> purchase_card(_agentName, _cardsAffordable, _actionParameters);
 		_actionType = 3 -> reserve_card(_agentName, _actionParameters);
 		false).
 

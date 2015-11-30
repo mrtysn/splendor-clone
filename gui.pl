@@ -2,13 +2,11 @@
 :- use_module(library(tabular)).
 
 card_edge(200).
-noble_edge(120).
+noble_edge(160).
 token_edge(80).
-area_size(size(160, 100)).
+reserve_edge(70).
+area_size(size(210, 100)).
 font_size(72).
-
-
-
 
 
 draw_tokens :-
@@ -24,18 +22,28 @@ draw_tokens :-
 		),
 	!.
 
-% cyan, magenta, yellow, white, purple, brown
-
 mark_card([_tier, _position]) :-
 	atomic_list_concat(['tier', _tier, 'slot', _position], _reference),
 	get(@_reference, member, scaled_bitmap, _card),
-	send_list(_card, [pen(5), colour(green)]),
+	send_list(_card, [pen(5), colour(green), cursor(exchange)]),
 	!.
 
 unmark_card([_tier, _position]) :-
 	atomic_list_concat(['tier', _tier, 'slot', _position], _reference),
 	get(@_reference, member, scaled_bitmap, _card),
-	send_list(_card, [pen(0)]),
+	send_list(_card, [pen(0), cursor('X_cursor')]),
+	!.
+
+mark_reserve(_agentId, _position) :-
+	atomic_list_concat(['agent', _agentId, 'reserve', _position], _reference),
+	get(@_reference, member, scaled_bitmap, _card),
+	send_list(_card, [pen(5), colour(green), cursor(exchange)]),
+	!.
+
+unmark_reserve(_agentId, _position) :-
+	atomic_list_concat(['agent', _agentId, 'reserve', _position], _reference),
+	((get(@_reference, member, scaled_bitmap, _card),
+	send_list(_card, [pen(0), cursor('X_cursor')]));true),
 	!.
 
 update_card(_id, _tier, _position) :-
@@ -53,10 +61,28 @@ update_card(_id, _tier, _position) :-
 	
 	send(@_reference, append, _card).
 
+update_reserves(_agentId, _reserves):-
+	reserve_edge(_reserveEdge),
+	foreach(
+		(
+			between(1, 3, _index),
+			atomic_list_concat(['agent', _agentId, 'reserve', _index], _reserveSlot),
+			nth1(_index, _reserves, _card),
+			nth1(1, _card, _id),
+			atomic_list_concat(['./resources/cards/', _id, '.jpg'], _path),
+			((get(@_reserveSlot, member, scaled_bitmap, _currentReserve), free(_currentReserve));true),
+			new(_reserve, scaled_bitmap(image(_path))),
+			send(_reserve, scale, size(_reserveEdge, _reserveEdge))
+		),
+		(
+			send(@_reserveSlot, append, _reserve)
+		)
+	), !.
+
 update_scoreboard_table(_agentId, _tokens, _cards, _score) :-
 	sum_list(_tokens, _tokensTotal),
 	atom_concat(_tokensTotal, ' / 10', _tokensTotalLabel),
-	atomic_list_concat(['agent', _agentId, 'area'], _reference),
+	atomic_list_concat(['agent', _agentId, 'scoreboard'], _reference),
 	
 	nth1(1, _tokens, _token1),
 	nth1(2, _tokens, _token2),
@@ -104,14 +130,23 @@ update_scoreboard_table(_agentId, _tokens, _cards, _score) :-
 
 % USE pce_global
 free_handles() :-
-	(free(@agent1area);true),
-	(free(@agent1reserves);true),
-	(free(@agent2area);true),
-	(free(@agent2reserves);true),
-	(free(@agent3area);true),
-	(free(@agent3reserves);true),
-	(free(@agent4area);true),
-	(free(@agent4reserves);true),
+	(free(@agent1scoreboard);true),
+	(free(@agent2scoreboard);true),
+	(free(@agent3scoreboard);true),
+	(free(@agent4scoreboard);true),
+
+	(free(@agent1reserve1);true),
+	(free(@agent1reserve2);true),
+	(free(@agent1reserve3);true),
+	(free(@agent2reserve1);true),
+	(free(@agent2reserve2);true),
+	(free(@agent2reserve3);true),
+	(free(@agent3reserve1);true),
+	(free(@agent3reserve2);true),
+	(free(@agent3reserve3);true),
+	(free(@agent4reserve1);true),
+	(free(@agent4reserve2);true),
+	(free(@agent4reserve3);true),
 	
 	(free(@tier3slot0);true),
 	(free(@tier3slot1);true),
@@ -146,71 +181,62 @@ free_handles() :-
 	(free(@token4count);true),
 	(free(@token5count);true),
 	(free(@token6count);true),
+
+	(free(@scoreBoard);true),
 	(free(@board);true),
 	!.
 
 create_board(_agents) :-
 	free_handles(),
 	new(@board, dialog('Splendor')),
-	send(@board, cursor, hand1),
 	send(@board, icon, new(_, bitmap('./resources/splendor_icon.xpm'))),
 	create_scoreboard(_agents),
+	create_reserve_area(4),
 	create_card_area,
 	create_token_area,
-	create_noble_area,
+	create_noble_area(_agents),
 	create_focus_area,
 	send(@board, open),
 	draw_tokens,
 	create_tier_images,
 	!.
 
-test :-
-	
-	update_scoreboard_table(1, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-	update_scoreboard_table(2, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-	update_scoreboard_table(3, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-	update_scoreboard_table(4, [0,0,0,0,0,0], [0,0,0,0,0], 0),
-
-	update_card(501, 0, 1),
-	update_card(502, 0, 2),
-	update_card(503, 0, 3),
-	update_card(504, 0, 4),
-	update_card(505, 0, 5),
-
-	update_card(201, 3, 1),
-	update_card(202, 3, 2),
-	update_card(203, 3, 3),
-	update_card(204, 3, 4),
-
-	update_card(101, 2, 1),
-	update_card(102, 2, 2),
-	update_card(103, 2, 3),
-	update_card(104, 2, 4),
-
-	update_card(1, 1, 1),
-	update_card(2, 1, 2),
-	update_card(3, 1, 3),
-	update_card(4, 1, 4),
-
-	mark_card(3,0),
-
-	!.
-
 create_scoreboard(_agents) :-
-	area_size(_areaSize),
+	area_size(_areaSize), reserve_edge(_reserveEdge),
 	length(_agents, _length),
 
-	send(@board, append, new(_scoreBoard, dialog_group('Score Board', group)), next_row),
+	send(@board, append, new(@scoreBoard, dialog_group('Score Board', group)), next_row),
 	% MARK PLAYER FRAMES WITH PEN
-	foreach((between(1, _length, _index), 
-		atomic_list_concat(['agent', _index, 'area'], _agentArea),
-		nth1(_index, _agents, _agentName),
-		send(_scoreBoard, append, new(_area, dialog_group(_agentName, box)))
+	foreach(
+		(
+			between(1, _length, _index), 
+			atomic_list_concat(['agent', _index, 'scoreboard'], _agentArea),
+			nth1(_index, _agents, _agentName),
+			send(@scoreBoard, append, new(_area, dialog_group(_agentName, box))),
+			send(_area, append, new(@_agentArea, dialog(size, _areaSize)), next_row)
+			%send(_area, append, new(_agentReserves, dialog_group('Reserves', box)), next_row)
 		), 
 		(
-			send(_area, append, new(@_agentArea, dialog(size, _areaSize)), next_row)
-		)),
-	!.
+			%% foreach(
+			%% 	(
+			%% 		between(1, 3, _indexReserve),
+			%% 		atomic_list_concat(['agent', _index, 'reserve', _indexReserve], _reserveSlot)
+			%% 	),
+			%% 	(
+			%% 		_indexReserve = 1 ->
+			%% 		send(_area, append, 
+			%% 			%new(@_reserveSlot, dialog(size, size(_reserveEdge, _reserveEdge))), 
+			%% 			new(@_reserveSlot, dialog_group('', group)),
+			%% 			next_row);
+			%% 		send(_area, append, 
+			%% 			%new(@_reserveSlot, dialog(size, size(_reserveEdge, _reserveEdge))), 
+			%% 			new(@_reserveSlot, dialog_group('', group)),
+			%% 			right)
+			%% 	)
+			%% )
+		true
+		)
+	), !.
 
 create_card_area :-
 	card_edge(_cardEdge),
@@ -250,6 +276,35 @@ create_card_area :-
 
 	
 	!.
+
+create_reserve_area(_agentCount) :-
+	send(@scoreBoard, append, new(_reserves, dialog_group('reserves', group)), next_row),
+	
+	reserve_edge(_reserveEdge),
+	_reserveSize = size(_reserveEdge, _reserveEdge),
+	_gapSize = size(_reserveEdge / 10, _reserveEdge / 10),
+	_boxSize = size(_reserveEdge * 34 / 10, _reserveEdge * 12 / 10),
+
+	foreach(
+		(
+			between(1, _agentCount, _agentId),
+			send(_reserves, append, new(_reserveBox, dialog_group('', box)), next_row)
+		),
+		(
+			send(_reserveBox, gap, _gapSize),
+			send(_reserveBox, size, _boxSize),
+			foreach(
+					(
+						between(1, 3, _reserveId),
+						atomic_list_concat(['agent', _agentId, 'reserve', _reserveId], _reference)
+					),
+					(
+						send(_reserveBox, append, new(@_reference, dialog(size, _reserveSize)), right)
+					)
+			)			
+		)
+	),
+!.
 
 create_tier_images :-
 	card_edge(_cardEdge),
@@ -366,20 +421,49 @@ write_card_left(_tier, _cardCount) :-
 	send(@_reference, display, _text, point(_cardEdge * 3 / 10, _cardEdge * 3 / 10)),
 	!.	
 
-create_noble_area :-
+create_noble_area(_agents) :-
+	proper_length(_agents, _agentCount),
+	_nobleCount is _agentCount + 1,
+
 	noble_edge(_nobleEdge),
 	send(@board, append, new(_nobles, dialog_group('Nobles', box)), right),
 
 	send(_nobles, gap, size(_nobleEdge / 10, _nobleEdge / 10)),
-	% MAKE THIS VARY WITH NOBLE SIZE, SO: CHANGE 5 TO #NOBLE, 6 TO #NOBLE+1
-	send(_nobles, size, size(_nobleEdge * 12 / 10, _nobleEdge * 56 / 10)),
+	send(_nobles, size, size(_nobleEdge * 12 / 10, _nobleEdge * (11 * _nobleCount + 1) / 10)),
 	_nobleSize = size(_nobleEdge, _nobleEdge),
-	
-	send(_nobles, append, new(@tier0slot1, dialog(size, _nobleSize)), next_row),
-	send(_nobles, append, new(@tier0slot2, dialog(size, _nobleSize)), next_row),
-	send(_nobles, append, new(@tier0slot3, dialog(size, _nobleSize)), next_row),
-	send(_nobles, append, new(@tier0slot4, dialog(size, _nobleSize)), next_row),
-	send(_nobles, append, new(@tier0slot5, dialog(size, _nobleSize)), next_row).
+
+	foreach(
+		(
+			between(1, _nobleCount, _index),
+			atomic_list_concat(['tier', 0, 'slot', _index], _reference),
+			send(_nobles, append, new(@_reference, dialog(size, _nobleSize)), next_row),
+			true
+			),
+		(
+			true
+			)
+		),
+	!.
+
+mark_noble(_agentName, _position) :-
+	get_color(_agentName, _color), !,
+	atomic_list_concat(['tier', 0, 'slot', _position], _reference),
+	new(_text, text(_agentName)),
+	send(_text, font, font(screen, bold, 36)),
+	send(_text, colour, _color),
+	send(_text, pen, 3),
+	send(@_reference, display, _text, point(0, 0)),
+	!.
+
+get_color(_agentName, _color) :-
+	agents(_agents),
+	nth1(_index, _agents, _agentName), !,
+	(_index = 1 -> _color = 'cyan';
+	_index = 2 -> _color = 'magenta';
+	_index = 3 -> _color = 'yellow';
+	_index = 4 -> _color = 'white';
+	_color = 'green'), !.
+get_color(_, 'green').
 
 create_focus_area :-
 	%send(@board, append, new(_currentAgent, dialog_group('Current Agent', box)), next_row),
