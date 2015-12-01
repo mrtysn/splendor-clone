@@ -1,9 +1,12 @@
+:- include(gui).
+
 :- dynamic tokens/2.
 :- dynamic cards/2.
 :- dynamic nobles/2.
 :- dynamic reserves/2.
 :- dynamic prestige/2.
 :- dynamic agent/1.
+
 
 delete_db :-
 	retractall(tokens(_, _)),
@@ -16,6 +19,9 @@ delete_db :-
 	!.
 
 init_db :-
+	open('splendor_log.txt',append,Stream),
+	write(Stream,'Game Start!'), nl(Stream),
+	close(Stream),
 	make,
 	assert(tokens(board, [0,0,0,0,0,0])),
 	consult(deck),
@@ -42,6 +48,12 @@ load_modules :-
 			assert(prestige(_agent, 0))
 		)
 	),
+	!.
+
+update_tokens(board, _tokens) :-
+	(retract(tokens(board, _));true),
+	assert(tokens(board, _tokens)),
+	gui_update_tokens_board(_tokens),
 	!.
 
 update_tokens(_owner, _tokens) :-
@@ -116,3 +128,4 @@ print_db(_owner) :-
 	print_nobles(_owner),
 	print_reserves(_owner),
 	print_prestige(_owner).
+

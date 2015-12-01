@@ -1,1 +1,1 @@
-agents([random_agent, random_agent_2, random_agent_3, random_agent_4]).
+agents([human, human2]).

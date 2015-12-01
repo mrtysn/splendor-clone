@@ -44,7 +44,7 @@ ask_action(_cardsAffordable, _action) :-
 
 take_tokens(_tokens) :-
 	tokens(board, _tokensBoard),
-	random_select(_r, [2, 3], _),
+	random_select(_r, [2, 3], _), !,
 	(_r = 2 -> 
 		(
 			!,

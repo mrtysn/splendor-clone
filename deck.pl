@@ -1,3 +1,4 @@
+
 %cards:[id,point,color,white#,blue#,green#,red#,black#]
 %ID's correspond to images of the card, so you can use this to fetch the related card.
 cards(deck1, [

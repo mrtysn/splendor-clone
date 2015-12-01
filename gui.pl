@@ -46,7 +46,7 @@ unmark_reserve(_agentId, _position) :-
 	send_list(_card, [pen(0), cursor('X_cursor')]));true),
 	!.
 
-update_card(_id, _tier, _position) :-
+gui_update_card(_id, _tier, _position) :-
 	card_edge(_cardEdge), noble_edge(_nobleEdge),
 
 	atomic_list_concat(['./resources/cards/', _id, '.jpg'], _path),
@@ -61,7 +61,7 @@ update_card(_id, _tier, _position) :-
 	
 	send(@_reference, append, _card).
 
-update_reserves(_agentId, _reserves):-
+gui_update_reserves(_agentId, _reserves):-
 	reserve_edge(_reserveEdge),
 	foreach(
 		(
@@ -79,7 +79,7 @@ update_reserves(_agentId, _reserves):-
 		)
 	), !.
 
-update_scoreboard_table(_agentId, _tokens, _cards, _score) :-
+gui_update_scoreboard_table(_agentId, _tokens, _cards, _score) :-
 	sum_list(_tokens, _tokensTotal),
 	atom_concat(_tokensTotal, ' / 10', _tokensTotalLabel),
 	atomic_list_concat(['agent', _agentId, 'scoreboard'], _reference),
@@ -191,7 +191,8 @@ create_board(_agents) :-
 	new(@board, dialog('Splendor')),
 	send(@board, icon, new(_, bitmap('./resources/splendor_icon.xpm'))),
 	create_scoreboard(_agents),
-	create_reserve_area(4),
+	proper_length(_agents, _nAgent),
+	create_reserve_area(_nAgent),
 	create_card_area,
 	create_token_area,
 	create_noble_area(_agents),
@@ -202,7 +203,7 @@ create_board(_agents) :-
 	!.
 
 create_scoreboard(_agents) :-
-	area_size(_areaSize), reserve_edge(_reserveEdge),
+	area_size(_areaSize),% reserve_edge(_reserveEdge),
 	length(_agents, _length),
 
 	send(@board, append, new(@scoreBoard, dialog_group('Score Board', group)), next_row),
@@ -345,7 +346,8 @@ create_token_area :-
 		),
 	!.
 
-update_tokens(_tokens) :-
+gui_update_tokens_board(_tokens) :-
+	!,
 	font_size(_fontSize),
 
 	nth1(1, _tokens, _token1),
@@ -389,11 +391,12 @@ update_tokens(_tokens) :-
 	send(_token6text, font, font(screen, bold, _fontSize)),
 	send(_token6text, colour, gold),
 	send(@token6count, append, _token6text),
-
 	!.
 
-write_card_left(0, _).
-write_card_left(_tier, 0) :-
+
+
+gui_write_card_left(0, _).
+gui_write_card_left(_tier, 0) :-
 	font_size(_fontSize), card_edge(_cardEdge),
 
 	atomic_list_concat(['tier', _tier, 'slot0'], _reference),
@@ -410,7 +413,7 @@ write_card_left(_tier, 0) :-
 	send(_text, colour, firebrick),
 	send(@_reference, display, _text, point(_cardEdge * 3 / 10, _cardEdge * 3 / 10)),
 	!.
-write_card_left(_tier, _cardCount) :-
+gui_write_card_left(_tier, _cardCount) :-
 	font_size(_fontSize), card_edge(_cardEdge),
 	atomic_list_concat(['tier', _tier, 'slot0'], _reference),
 	((get(@_reference, member, text, _currentCount), free(_currentCount));true),

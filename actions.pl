@@ -1,13 +1,12 @@
 action(_agent) :-
 	get_affordable_cards(_agent, _cardsAffordable),
+	mark_affordable_cards(_cardsAffordable),
 	!,
-	ask_action(_agent, _cardsAffordable, _action),
-	!,
+	(ask_action(_agent, _cardsAffordable, _action),
 	verify_action(_agent, _cardsAffordable, _action),
-	!,
 	apply_action(_agent, _action),
-	!,
-	announce_action(_agent, _action),
+	announce_action(_agent, _action));
+	(write('wrong action!'), nl, true),
 	!.
 
 ask_action(_agent, _cardsAffordable, _action) :-
@@ -28,6 +27,12 @@ apply_action(_agent, [_actionType, _actionParams]) :-
 	false.
 
 announce_action(_agent, _action) :-
+	update_scoreboard_for(_agent),
+	open('splendor_log.txt',append,Stream),
+	write(Stream,_agent), nl(Stream),
+	write(Stream,_action), nl(Stream),
+	close(Stream),
+
 	agents(_agents), proper_length(_agents, _nAgent),
 	forall(
 		(
@@ -191,7 +196,7 @@ purchase_card(_agent, [_tier, _position, _tokens]) :-
 	cards(_deck, _cardsDeck),
 
 	select(_card, _cardsArea, null, _cardsAreaTemp),
-	move_n_random(1, _cardsDeck, _cardsAreaTemp,
+	move_n_random(1, _tier, _cardsDeck, _cardsAreaTemp,
 		_cardsDeckNew, _cardsAreaNew),
 
 	nth1(2, _card, _prestigeCard),
@@ -238,7 +243,7 @@ reserve_card(_agent, [_tier, _position]) :-
 		(_position = 0) -> 
 			(	
 				append(_reservesAgent, [null], _reservesAgentTemp),
-				move_n_random(1, _cardsDeck, _reservesAgentTemp,
+				move_n_random(1, _tier, _cardsDeck, _reservesAgentTemp,
 					_cardsDeckNew, _reservesAgentNew)
 			);
 			(
@@ -247,7 +252,7 @@ reserve_card(_agent, [_tier, _position]) :-
 				nth1(_position, _cardsArea, _card),
 				append(_reservesAgent, [_card], _reservesAgentNew),
 				select(_card, _cardsArea, null, _cardsAreaTemp),
-				move_n_random(1, _cardsDeck, _cardsAreaTemp,
+				move_n_random(1, _tier, _cardsDeck, _cardsAreaTemp,
 					_cardsDeckNew, _cardsAreaNew),
 				update_cards(_area, _cardsAreaNew)
 			)
@@ -281,7 +286,7 @@ reserve_card(_agent, [_tier, _position]) :-
 
 token_overload_check(_agent) :-
 	tokens(_agent, _tokensAgent),
-	proper_length(_tokensAgent, _nToken),
+	sum_list(_tokensAgent, _nToken),
 	(	
 		_nToken > 10 ->
 			(
@@ -289,11 +294,11 @@ token_overload_check(_agent) :-
 					(
 						_agent:token_overload(_tokensAgent, _tokensReturned),
 						maplist(plus, _tokensAgentNew, _tokensReturned, _tokensAgent),
-						proper_length(_tokensAgentNew, _nTokenNew),
+						sum_list(_tokensAgentNew, _nTokenNew),
 						_nTokenNew = 10
 					);
 					(
-						proper_length(_tokensAgent, _tokenCount),
+						sum_list(_tokensAgent, _tokenCount),
 						_returnCount is _tokenCount - 10,
 						random_tokens(_returnCount, _tokensAgent, [0,0,0,0,0,0], _tokensAgentNew, _tokensReturned)
 					)
@@ -333,6 +338,7 @@ random_tokens(N, From, To, Rest, Result) :-
 
 noble_check(_agent) :-
 	get_affordable_nobles(_agent, _noblesAffordable),
+	
 	(	
 		_noblesAffordable = [] ->
 			(

@@ -55,3 +55,10 @@ Can you automatize the launch with a script/predicate? (You don’t need to writ
 UNIQUE AGENT NAMES
 write unit tests
 change gui to grid
+
+
+init_agent
+ask_action
+announce_action
+token_overload
+choose_noble
