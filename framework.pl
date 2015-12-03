@@ -1,320 +1,267 @@
-:- dynamic deck1/1.
-:- dynamic deck2/1.
-:- dynamic deck3/1.
-:- dynamic nobles/1.
-:- dynamic area1/1.
-:- dynamic area2/1.
-:- dynamic area3/1.
-:- dynamic coins/1.
-:- dynamic playerCoins/1.
-:- dynamic playerCards/1.
-:- dynamic playerReserves/1.
-:- dynamic currentPlayer/1.
+:- include(splendor_db).
+:- include(actions).
 
-:- retractall(deck1(_)).
-:- retractall(deck2(_)).
-:- retractall(deck3(_)).
-:- retractall(area1(_)).
-:- retractall(area2(_)).
-:- retractall(area3(_)).
-:- retractall(nobles(_)).
-:- retractall(coins(_)).
-:- retractall(playerCoins(_)).
-:- retractall(playerCards(_)).
-:- retractall(currentPlayer(_)).
+go :-
+	init,
+	round.
 
-:- include(deck).
-
-agents([bot1, bot2, bot3, bot4]).
-
-resetDB() :-
-	retractall(deck1(_)),
-	retractall(deck2(_)),
-	retractall(deck3(_)),
-	retractall(area1(_)),
-	retractall(area2(_)),
-	retractall(area3(_)),
-	retractall(nobles(_)),
-	retractall(coins(_)),
-	retractall(playerCoins(_)),
-	retractall(playerCards(_)),
-	retractall(currentPlayer(_)).
-
-start() :-
-	initialization(),
-	run().
-
-initialization() :-
-	agents(Agents),
-	proper_length(Agents, N_Player), !,
+loop :-
+	agent(_id),
+	(_id = 0 -> 
 	(	
-		N_Player == 2 -> N_Coin is 4;
-		N_Player == 3 -> N_Coin is 5; 
-		N_Player == 4 -> N_Coin is 7;
-		false
-	),
-
-	N_Noble is N_Player + 1,
-	
-	deck1(Tier1),
-	deck2(Tier2),
-	deck3(Tier3),
-	nobles(AllNobles),
-
-	empty_list_of_length_N(4, Null1),
-	empty_list_of_length_N(4, Null2),
-	empty_list_of_length_N(4, Null3),
-	empty_list_of_length_N(N_Noble, Null4),
-	
-	draw_N_cards(4, Tier1, Null1, Deck1, Area1), !,
-	draw_N_cards(4, Tier2, Null2, Deck2, Area2), !,
-	draw_N_cards(4, Tier3, Null3, Deck3, Area3), !,
-	draw_N_cards(N_Noble, AllNobles, Null4, _, Nobles), !,
-
-	resetDB(),
-
-	assert(deck1(Deck1)), !,
-	assert(deck2(Deck2)), !,
-	assert(deck3(Deck3)), !,
-	assert(area1(Area1)), !,
-	assert(area2(Area2)), !,
-	assert(area3(Area3)), !,
-	assert(nobles(Nobles)), !,
-	assert(coins([N_Coin, N_Coin, N_Coin, N_Coin, N_Coin, 3])), !,
-	
-	initializePlayers(N_Player).
-
-
-run() :- 
-	currentPlayer(CurrentPlayer),
-	agents(Agents),
-	nth(CurrentPlayer, Agents, Agent),
-	
-	
-	next_player().
-	%run().
-
-%gameDidNotEnd(state),
-%		whoseTurnIsIt(index, newIndex),
-%		whatIsYourAction(state, newIndex, action),
-%		applyAction(state, action),
-%		run().
-
-draw_N_cards(_, [], To, [], To).
-draw_N_cards(0, From, To, From, To).
-draw_N_cards(N, From, To, Rest, Result) :-
-	N > 0,
-	M is N-1,
-	(random_select(X, From, Remainder) -> 
-		(select(null, To, X, Acc), draw_N_cards(M, Remainder, Acc, Rest, Result));
-		true).
-
-empty_list_of_length_N(0, []).
-empty_list_of_length_N(1, [null]).
-empty_list_of_length_N(N, [null|List]) :-
-	N > 0,
-	M is N-1,
-	empty_list_of_length_N(M, List).
-
-list_of_length_N(0, _, []).
-list_of_length_N(1, X, [X]) :- !.
-list_of_length_N(N, X, [X|List]) :-
-	N > 0,
-	M is N-1,
-	list_of_length_N(M, X, List).
-
-initializePlayers(N) :-
-	assert(currentPlayer(1)),
-	initializePlayerCoins(N),
-	initializePlayerCards(N).
-
-initializePlayerCoins(N) :-
-	%list_of_length_N(6, 0, L),
-	list_of_length_N(6, 7, L),
-	populateList([], L, N, PlayerCoins), !,
-	assert(playerCoins(PlayerCoins)), !.
-
-initializePlayerCards(N) :-
-	populateList([], [], N, PlayerCards), !,
-	assert(playerCards(PlayerCards)), !.
-
-populateList(Input, _, 0, Input).
-populateList(Input, Parameter, 1, Result) :-
-	append(Input, [Parameter], Result), !.
-populateList(Input, Parameter, Count, Result) :-
-	NewCount is Count-1,
-	append(Input, [Parameter], NewInput),
-	populateList(NewInput, Parameter, NewCount, Result).
-
-take_coins(CoinList) :- 
-	proper_length(CoinList, 5),
-	min_member(MinCoin, CoinList),
-	MinCoin is 0,
-	nth0(0, CoinList, White),
-	nth0(1, CoinList, Blue),
-	nth0(2, CoinList, Green),
-	nth0(3, CoinList, Red),
-	nth0(4, CoinList, Black),
-
-	coins(BoardCoins),
-	nth0(0, BoardCoins, BoardWhite),
-	nth0(1, BoardCoins, BoardBlue),
-	nth0(2, BoardCoins, BoardGreen),
-	nth0(3, BoardCoins, BoardRed),
-	nth0(4, BoardCoins, BoardBlack),
-	nth0(5, BoardCoins, BoardGold),
-	
-	WhiteLeft is BoardWhite - White,
-	BlueLeft is BoardBlue - Blue,
-	GreenLeft is BoardGreen - Green,
-	RedLeft is BoardRed - Red,
-	BlackLeft is BoardBlack - Black,
-
-	WhiteLeft >= 0,
-	BlueLeft >= 0,
-	GreenLeft >= 0,
-	RedLeft >= 0,
-	BlackLeft >= 0,
-
-	(White > 0 -> BetaWhite is 1; BetaWhite is 0),
-	(Blue > 0 -> BetaBlue is 1; BetaBlue is 0),
-	(Green > 0 -> BetaGreen is 1; BetaGreen is 0),
-	(Red > 0 -> BetaRed is 1; BetaRed is 0),
-	(Black > 0 -> BetaBlack is 1; BetaBlack is 0),
-
-	sum_list(CoinList, SumCoinList),
-	SumBeta is (BetaWhite + BetaBlue + BetaGreen + BetaRed + BetaBlack),
-	
+		!,
+		next_agent,
+		round
+	);
 	(
-		((SumCoinList == 2), (SumBeta == 1)) -> (!, two_of_a_kind(BetaWhite, WhiteLeft, BetaBlue, BlueLeft, BetaGreen, GreenLeft, BetaRed, RedLeft, BetaBlack, BlackLeft));
-		((SumCoinList == 3), (SumBeta == 3)) -> (!);
-		(SumCoinList == 1) -> (!, no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, Black, BlackLeft));
-		false
+		agents(_agents),
+		nth1(_id, _agents, _agent),
+		write(_agent), nl,
+		action(_agent),
+		token_overload_check(_agent),
+		noble_check(_agent),
+		next_agent,
+		loop
+	)).
+
+next_agent :-
+	agents(_agents),
+	proper_length(_agents, _nAgent),
+	agent(_id),
+	_idTemp is _id + 1,
+	((_idTemp > _nAgent, _idNew is 0);(_idNew is _idTemp)),
+	retract(agent(_)),
+	assert(agent(_idNew)),
+	!.
+
+round :-
+	\+condition -> end_game; loop.
+
+end_game :-
+	!,
+	findall(_prestige, prestige(_, _prestige), _points),
+	max_list(_points, _max),
+	findall(_agent, 
+		(
+			prestige(_agent, _prestige),
+			_prestige = _max
+		),
+		 _agents),
+	aggregate_all(min(_nCard, _agent), 
+		(
+			member(_agent, _agents),
+			cards(_agent, _cardsAgent),
+			proper_length(_cardsAgent, _nCard)
+		),
+		 _winners),
+	
+	open('splendor_log.txt',append,Stream),
+	write(Stream, _winners), nl(Stream),
+	close(Stream),
+	halt.
+
+condition :-
+	findall(_prestige, prestige(_, _prestige), _points),
+	max_list(_points, _max),
+	_max < 15.
+
+init :-
+	make,
+	reset_db,
+	agents(_agents),
+	create_board(_agents),
+
+	proper_length(_agents, _nAgent),
+	(	_nAgent = 2 -> _nToken = 4;
+		_nAgent = 3 -> _nToken = 5;
+		_nAgent = 4 -> _nToken = 7;
+		false),
+	_tokensBoard = [_nToken, _nToken, _nToken, _nToken, _nToken, 5],
+
+	cards(deck1, _deck1),
+	cards(deck2, _deck2),
+	cards(deck3, _deck3),
+	move_n_random(4, 1, _deck1, [null, null, null, null], 
+		_deck1New, _area1New),
+	move_n_random(4, 2, _deck2, [null, null, null, null], 
+		_deck2New, _area2New),
+	move_n_random(4, 3, _deck3, [null, null, null, null], 
+		_deck3New, _area3New),
+	update_cards(deck1, _deck1New),
+	update_cards(deck2, _deck2New),
+	update_cards(deck3, _deck3New),
+	update_cards(area1, _area1New),
+	update_cards(area2, _area2New),
+	update_cards(area3, _area3New),
+
+	nobles(board, _nobles),
+	_nNoble is _nAgent + 1,
+	findall(null, between(1, _nNoble, _), _noblesOld),
+	move_n_random(_nNoble, 0, _nobles, _noblesOld, _, _noblesNew),
+	update_nobles(board, _noblesNew),
+
+	update_tokens(board, _tokensBoard),
+	forall(
+		(
+			between(1, _nAgent, _i),
+			nth1(_i, _agents, _agent)
+		),
+		(
+			_agent:init_agent(_agents, _area1New, _area2New, _area3New, _noblesNew),
+			update_scoreboard_for(_agent)
+		)
+	),
+	
+	assert(agent(1)),
+
+	
+	!.
+
+negative_to_zero([], []) :- !.
+negative_to_zero([H], [0]) :-
+	H < 0, !.
+negative_to_zero([H], [H]) :- !.
+negative_to_zero([H|T], [0|Result]) :-
+	H < 0, !,
+	negative_to_zero(T, Result).
+negative_to_zero([H|T], [H|Result]) :-
+	negative_to_zero(T, Result).
+
+move_n_random(_, _, [], To, [], To) :- !.
+move_n_random(0, _, From, To, From, To) :- !.
+move_n_random(N, Tier, From, To, Rest, Result) :-
+	N > 0, M is N-1,
+	random_select(Card, From, Remainder),
+	select(null, To, Card, Acc), !,
+	
+	proper_length(Remainder, CardsLeft),
+	gui_write_card_left(Tier, CardsLeft),
+
+	nth1(1, Card, CardId),
+	nth1(Index, To, null),
+	gui_update_card(CardId, Tier, Index),
+
+	move_n_random(M, Tier, Remainder, Acc, Rest, Result),
+	!.
+
+get_affordable_cards(_agentName, _cardTuples) :-
+	tokens(_agentName, _tokensAgent),
+	cards(_agentName, _cardsAgent),
+	calculate_agent_card_wealth(_cardsAgent, _cardWealthAgent),
+	aggregate_all(
+		(bag([_tier, _position])),
+		(
+			between(1, 3, _tier),
+			between(1, 4, _position),
+			atom_concat(area, _tier, _area),
+			cards(_area, _cardsArea),
+			nth1(_position, _cardsArea, _card),
+			check_card_affordance(_card, _tokensAgent, _cardWealthAgent)
+		),
+		(_affordablesBoard)
 	), !,
 
-	retract(coins(_)), !,
-	assert(coins([WhiteLeft, BlueLeft, GreenLeft, RedLeft, BlackLeft, BoardGold])), !.
+	reserves(_agentName, _reservesAgent),
+	aggregate_all(
+		(bag([4, _position])),
+		(
+			nth1(_position, _reservesAgent, _card),
+			check_card_affordance(_card, _tokensAgent, _cardWealthAgent)
+		),
+		(_affordablesReserve)
+	), !,
+	append(_affordablesBoard, _affordablesReserve, _cardTuples).
+
+check_card_affordance(_card, _tokensAgent, _cardWealthAgent):-
+	append([_,_,_], _cardCostTemp, _card),
+	append(_cardCostTemp, [0], _cardCost),
+
+	maplist(plus, _cardWealthAgent, _cardEffectiveCostTemp, _cardCost),
+	negative_to_zero(_cardEffectiveCostTemp, _cardEffectiveCost),
+	maplist(plus, _tokensAgent, _surplus, _cardEffectiveCost),
+	negative_to_zero(_surplus, _surplusActual),
+	sum_list(_surplusActual, _yellowTokensNecessary),
+	nth1(6, _tokensAgent, _yellowTokens),
+	_yellowTokensNecessary =< _yellowTokens,
+	!.
+
+calculate_agent_card_wealth([], [0, 0, 0, 0, 0, 0]).
+calculate_agent_card_wealth(_cards, _cardWealth) :-
+	maplist(nth1(3), _cards, _colors),
+	aggregate_all(count, member('white',	_colors), _whiteCards),
+	aggregate_all(count, member('blue',		_colors), _blueCards),
+	aggregate_all(count, member('green',	_colors), _greenCards),
+	aggregate_all(count, member('red',		_colors), _redCards),
+	aggregate_all(count, member('black',	_colors), _blackCards),
+	!, _cardWealth = [_whiteCards, _blueCards, _greenCards, _redCards, _blackCards, 0].
+
+get_affordable_nobles(_agentName, _noblesAffordable) :-
+	nobles(board, _noblesBoard),
+	cards(_agentName, _cardsAgent),
+	calculate_agent_card_wealth(_cardsAgent, _cardWealth),
+	append(_cardWealthActual, [_], _cardWealth),
+
+	aggregate_all(
+		(bag(_noble)),
+		(
+			member(_noble, _noblesBoard),
+			(\+(_noble = null)),
+			append([_], _nobleCost, _noble),
+			maplist(plus, _nobleCost, _surplus, _cardWealthActual),
+			min_member(_min, _surplus), _min >= 0,
+			true
+		),
+		(_noblesAffordable)
+	), !.
+
+update_scoreboard_for(_agent) :-
+	agents(_agents),
+	nth1(_agentId, _agents, _agent),
+	tokens(_agent, _agentTokens),
+	cards(_agent, _agentCards),
+	calculate_agent_card_wealth(_agentCards, _cardWealth),
+	prestige(_agent, _prestigeAgent),
+	gui_update_scoreboard_table(_agentId, _agentTokens, _cardWealth, _prestigeAgent).
 
 
-two_of_a_kind(BetaWhite, WhiteLeft, BetaBlue, BlueLeft, BetaGreen, GreenLeft, BetaRed, RedLeft, BetaBlack, BlackLeft):-
-	((0 is BetaWhite);(WhiteLeft >= 2)), !,
-	((0 is BetaBlue);(BlueLeft >= 2)), !,
-	((0 is BetaGreen);(GreenLeft >= 2)), !,
-	((0 is BetaRed);(RedLeft >= 2)), !,
-	((0 is BetaBlack);(BlackLeft >= 2)), !.
-
-no_coin_left(White, WhiteLeft, Blue, BlueLeft, Green, GreenLeft, Red, RedLeft, Black, BlackLeft):-
-	(White == 0 -> WhiteLeft == 0; WhiteLeft < 3),
-	(Blue == 0 -> BlueLeft == 0; BlueLeft < 3),
-	(Green == 0 -> GreenLeft == 0; GreenLeft < 3),
-	(Red == 0 -> RedLeft == 0; RedLeft < 3),
-	(Black == 0 -> BlackLeft == 0; BlackLeft < 3).
-
-next_player() :-
-	agents(Agents),
-	proper_length(Agents, N_Player),
-	currentPlayer(CurrentPlayer),
-	NextPlayer is ((CurrentPlayer+1) mod N_Player),
-	retract(currentPlayer(_)),
-	assert(currentPlayer(NextPlayer)).
-
-purchase_card(Player, Tier, Position) :-
-	playerCoins(PlayerCoins),
-	nth1(Player, PlayerCoins, Coins),
-
-	playerCards(PlayerCards),
-	nth1(Player, PlayerCards, Cards),
-
-	findall(Color, (member(PlayerCard, PlayerCards), nth1(3, PlayerCard, Color)), Colors),
-	findall(true, member('white', Colors), Whites),
-	length(Whites, WhiteCards),
-	findall(true, member('blue', Colors), Blues),
-	length(Blues, BlueCards),
-	findall(true, member('green', Colors), Greens),
-	length(Greens, GreenCards),
-	findall(true, member('red', Colors), Reds),
-	length(Reds, RedCards),
-	findall(true, member('black', Colors), Blacks),
-	length(Blacks, BlackCards),	
-	
-	nth1(1, Coins, WhiteCoins),
-	nth1(2, Coins, BlueCoins),
-	nth1(3, Coins, GreenCoins),
-	nth1(4, Coins, RedCoins),
-	nth1(5, Coins, BlackCoins),
-	nth1(6, Coins, GoldCoins),
-
-	between(1, 4, Position),
-	(
-		(Tier == 1) -> (area1(Area), deck1(Deck));
-		(Tier == 2) -> (area2(Area), deck2(Deck));
-		(Tier == 3) -> (area3(Area), deck3(Deck));
-		false
+mark_affordable_cards(_cardsAffordable) :-
+	aggregate_all(
+		(count),
+		(
+			between(1, 3, _tier),
+			between(1, 4, _position),
+			unmark_card([_tier, _position]),
+			true
+		),
+		(_)
 	),
-	nth1(Position, Area, Card),
+	!,
+	aggregate_all(
+		(count),
+		(
+			member(_card, _cardsAffordable),
+			mark_card(_card)
+		),
+		(_)
+	),
+	!.
 
-	nth1(4, Card, WhiteCost),
-	nth1(5, Card, BlueCost),
-	nth1(6, Card, GreenCost),
-	nth1(7, Card, RedCost),
-	nth1(8, Card, BlackCost),
-
-	WhiteLeft is (WhiteCoins + WhiteCards - WhiteCost),
-	BlueLeft is (BlueCoins + BlueCards - BlueCost),
-	GreenLeft is (GreenCoins + GreenCards - GreenCost),
-	RedLeft is (RedCoins + RedCards - RedCost),
-	BlackLeft is (BlackCoins + BlackCards - BlackCost),
-
-	WhiteLeft >= 0,
-	BlueLeft >= 0,
-	GreenLeft >= 0,
-	RedLeft >= 0,
-	BlackLeft >= 0,
-
-	% this is wrong
-	WhiteCoinLeft is (WhiteCoins - WhiteCost + WhiteCards),
-	BlueCoinLeft is (BlueCoins - BlueCost + BlueCards),
-	GreenCoinLeft is (GreenCoins - GreenCost + GreenCards),
-	RedCoinLeft is (RedCoins - RedCost + RedCards),
-	BlackCoinLeft is (BlackCoins - BlackCost + BlackCards),
-
-	CoinsNew = [WhiteCoinLeft, BlueCoinLeft, GreenCoinLeft, RedCoinLeft, BlackCoinLeft, GoldCoins],
-
-	append(Cards, [Card], CardsNew),
-	select(Cards, PlayerCards, CardsNew, PlayerCardsNew),
-	select(Coins, PlayerCoins, CoinsNew, PlayerCoinsNew),
-	select(Card, Area, null, AreaTemp),
-	draw_N_cards(1, Deck, AreaTemp, DeckNew, AreaNew), !,
-
-	retract(playerCards(_)),
-	assert(playerCards(PlayerCardsNew)),
-	retract(playerCoins(_)),
-	assert(playerCoins(PlayerCoinsNew)),
-
-	(
-		(Tier == 1) -> (
-			retract(deck1(_)),
-			assert(deck1(DeckNew)),
-			retract(area1(_)),
-			assert(area1(AreaNew))
-		);
-		(Tier == 2) -> (
-			retract(deck2(_)),
-			assert(deck2(DeckNew)),
-			retract(area2(_)),
-			assert(area2(AreaNew))
-		);
-		(Tier == 3) -> (
-			retract(deck3(_)),
-			assert(deck3(DeckNew)),
-			retract(area3(_)),
-			assert(area3(AreaNew))
-		);
-		false
-	).
-
-	
-%To pay the cost, first the player has to 
-%look for cost reductions provided by 
-%his built developments, and only pay the 
-%surplus with gem chips
+mark_affordable_reserves(_agentId, _reservesAffordable) :-
+	aggregate_all(
+		(count),
+		(
+			between(1, 4, _id),
+			between(1, 3, _position),
+			unmark_reserve(_id, _position)
+		),
+		(_)
+	),
+	!,
+	aggregate_all(
+		(count),
+		(
+			member(_position, _reservesAffordable),
+			mark_reserve(_agentId, _position)
+		),
+		(_)
+	), !.	
