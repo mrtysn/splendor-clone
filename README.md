@@ -1,6 +1,4 @@
 # splendor-clone
-A Prolog implementation of the card game Splendor.
-
 This is a prolog implementation of the card game Splendor.
 
 In order to be able to play this game, you need to implement your own agents or you can use the human interface. There is also a random bot included.
@@ -18,6 +16,6 @@ Action parameter for purchasing cards is [Tier, Position, [c{1}, c{2}, c{3}, c{4
 
 Action parameter for reserving a card is [Tier, Position] which specifies the card you are willing to reserve.
 
-You can launch the game by starting the prolog session, consulting(framework), typing "init." and "loop.".
+You can launch the game by starting the prolog session, consulting(framework), typing "go.".
 
 Humans and agents use the same method for giving commands to the frame.
